@@ -1,0 +1,16 @@
+<package>
+  <description brief="estimator_node">
+
+     estimator_node
+
+  </description>
+  <author>puppeteer</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/estimator_node</url>
+
+  <depend package="roscpp"/>
+  <depend package="puppeteer_msgs"/>
+</package>
+
+
