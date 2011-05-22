@@ -19,6 +19,8 @@
 #include <puppeteer_msgs/State.h>
 #include <puppeteer_msgs/position_request.h>
 
+#include <math.h>
+
 //---------------------------------------------------------------------------
 // Global Variables
 //---------------------------------------------------------------------------
@@ -32,12 +34,12 @@ class StateEstimator {
 
 private:
   ros::NodeHandle n_;
-  ros::Subscriber sub_;
-  ros::Publisher state_pub;
-  ros::Time t_now, t_last, dt;
+  ros::Subscriber sub;
+  ros::Publisher pub;
+  ros::Time t_now, t_last;
   ros::ServiceClient client;
 
-  puppeteer_msgs::State state, state_last;  // current and previous system states
+  puppeteer_msgs::State state;  // current and previous system states
   puppeteer_msgs::position_request srv;
 
   bool error_m;
@@ -48,27 +50,38 @@ private:
   float xc_dot, zc_dot, xc_dot_last, zc_dot_last;  // current and previous cart velocities
   float r, r_last;  // current and previous string lengths
   float r_dot, r_dot_last;  // current and previous rate of change of string length
+  float th, th_last;
+  float th_dot, th_dot_last;
+  float dt;
 
 public:
   StateEstimator() {
-    sub_ = n_.subscribe("/object1_position", 1, &StateEstimator::trackercb, this);
-    state_pub = n_.advertise<puppeteer_msgs::State> ("system_state", 100);
+    sub = n_.subscribe("/object1_position", 1, &StateEstimator::trackercb, this);
+    pub = n_.advertise<puppeteer_msgs::State> ("system_state", 100);
     client = n_.serviceClient<puppeteer_msgs::position_request>("position_request");
     t_now = ros::Time::now();
 
-    error_m = false;
-    error_c = false;
+    // initialize communication error parameters to true for safety
+    error_m = true;
+    error_c = true;
 
+    // initialize all state variables to zero
     xm = 0.0; ym = 0; zm = 0; xm_last = 0; ym_last = 0; zm_last = 0; 
     xm_dot = 0; ym_dot = 0; zm_dot = 0; xm_dot_last = 0; ym_dot_last = 0; zm_dot_last = 0;
     xc = 0.0; zc = 0.0; xc_last = 0.0; zc_last = 0.0;
     xc_dot = 0.0; zc_dot = 0.0; xc_dot_last = 0.0; zc_dot_last = 0.0;
     r = 0.0; r_last = 0.0; 
     r_dot = 0.0; r_dot_last = 0.0;
-    
+    th = 0.0; th_last = 0.0;
+    th_dot = 0.0; th_dot_last = 0.0;
+
+    dt = 0.0;
   }
 
   void trackercb(const puppeteer_msgs::PointPlus &point) {
+    // get error flag from object tracker data
+    error_m = point.error;
+
     // request robot position
     srv.request.robot_index = 2;  // hardcoding this for now
     srv.request.type = 'w';
@@ -77,27 +90,20 @@ public:
     srv.request.Vtop = 0.0;
     srv.request.div = 0;
 
+    // call service and store error flag
     if(client.call(srv)) {
-      if(srv.response.error == 1) {
-	ROS_DEBUG("Send Successful: speed_command\n");
-      }
-      else if(srv.response.error == 0) {
-	ROS_DEBUG("Send Request Denied: speed_command\n");
-	static bool request_denied_notify = true;
-	if(request_denied_notify) {
-	  ROS_ERROR("Send Requests Denied: speed_command\n");
-	  request_denied_notify = false;
-	}
-      }
+      error_c = srv.response.error;
     }
+    // print error if the service call failed (not the same as a successful service call with a bad reply)
     else {
-      ROS_ERROR("Failed to call service: speed_command\n");
+      ROS_ERROR("Failed to call service: position_request");
     }
 
-
+    // get current time and dt to last call
     t_last = t_now;
     t_now = ros::Time::now();
-    dt = t_now-t_last;
+    dt = (t_now.toSec()-t_last.toSec());
+    ROS_DEBUG("dt: %f", dt);
 
     // store last positions and velocities
     xm_last = xm;
@@ -112,31 +118,34 @@ public:
     zc_dot_last = zc_dot;
     r_last = r;
     r_dot_last = r_dot;
-
-    // save current state as last
-    state_last = state;
-
-    // get error flag from object tracker data
-    error_m = point.error;
+    th_last = th;
+    th_dot_last = th_dot;
 
     // did we get good mass position data from the object tracker and robot?
-    if(error_m == false) {
+    if(error_m == false && error_c == false) {
+      ROS_DEBUG("Successful update to mass and cart");
+
       // get new mass position data
       xm = point.x;
       ym = point.y;
       zm = point.z;
 
-      // get mew robot position data
+      // get new robot position data
+      xc = srv.response.xc;
+      zc = srv.response.zc;
+      th = srv.response.th;
 
       // calculate string length
+      // ignore z dimension for now and assume planar motion in x and y
+      r = sqrt(powf((xc-xm),2)+powf((ym),2));
 
       // calculate new velocities
-      xm_dot = (xm - xm_last)/dt;
-      ym_dot = (ym - ym_last)/dt;
-      zm_dot = (zm - zm_last)/dt;
-      xc_dot = (xc - xc_last)/dt;
-      zc_dot = (zc - zc_last)/dt;
-      r_dot = (r - r_last)/dt;
+      xm_dot = (xm-xm_last)/dt;
+      ym_dot = (ym-ym_last)/dt;
+      zm_dot = (zm-zm_last)/dt;
+      xc_dot = (xc-xc_last)/dt;
+      zc_dot = (zc-zc_last)/dt;
+      r_dot = (r-r_last)/dt;
       
       // assign various components of system state
       state.xm = xm;
@@ -149,26 +158,116 @@ public:
       state.r_dot = r_dot;
 
       // publish system state
-      state_pub.publish(state);
+      pub.publish(state);
     }
-    // estimate positions and velocities if we missed a data point
-    else {
-      ROS_WARN("Missing Data Point");
 
-      // use old velocity values
+    // we missed the mass update but got the robot update
+    else if(error_m == true && error_c == false) {
+      ROS_WARN("Missed mass update");
+
+      // use old mass velocity values
       xm_dot = xm_dot_last;
       ym_dot = ym_dot_last;
       zm_dot = zm_dot_last;
-      xc_dot = xc_dot_last;
-      zc_dot = zc_dot_last;
-      r_dot = r_dot_last;
 
-      // calculate new positions given these velocities
+      // calculate new mass position given these velocities
       xm += xm_dot*dt;
       ym += ym_dot*dt;
       zm += zm_dot*dt;
+
+      // get new robot position data
+      xc = srv.response.xc;
+      zc = srv.response.zc;
+      th = srv.response.th;
+
+      // calculate string length
+      // ignore z dimension for now and assume planar motion in x and y
+      r = sqrt(powf((xc-xm),2)+powf((ym),2));
+
+      // calculate new velocities
+      xc_dot = (xc-xc_last)/dt;
+      zc_dot = (zc-zc_last)/dt;
+      r_dot = (r-r_last)/dt;
+            
+      // assign various components of system state
+      state.xm = xm;
+      state.ym = ym;
+      state.xc = xc;
+      state.r = r;
+      state.xm_dot = xm_dot;
+      state.ym_dot = xc_dot;
+      state.xc_dot = xc_dot;
+      state.r_dot = r_dot;
+
+      // publish system state
+      pub.publish(state);
+    }
+
+    // we missed the robot update but got the mass update
+    else if(error_m == false && error_c == true) {
+      ROS_WARN("Missed cart update");
+      
+      // get new mass position data
+      xm = point.x;
+      ym = point.y;
+      zm = point.z;
+
+      // use old robot velocity values
+      xc_dot = xc_dot_last;
+      zc_dot = zc_dot_last;
+      
+      // calculate new robot position given these velocities
       xc += xc_dot*dt;
       zc += zc_dot*dt;
+      
+      // calculate string length
+      // ignore z dimension for now and assume planar motion in x and y
+      r = sqrt(powf((xc-xm),2)+powf((ym),2));
+
+      // calculate new velocities
+      xm_dot = (xm-xm_last)/dt;
+      ym_dot = (ym-ym_last)/dt;
+      zm_dot = (zm-zm_last)/dt;
+
+      // assign various components of system state
+      state.xm = xm;
+      state.ym = ym;
+      state.xc = xc;
+      state.r = r;
+      state.xm_dot = xm_dot;
+      state.ym_dot = xc_dot;
+      state.xc_dot = xc_dot;
+      state.r_dot = r_dot;
+
+      // publish system state
+      pub.publish(state);
+    }
+    // otherwise, we missed both robot and mass state updates
+    else {
+      ROS_WARN("Missed both mass and cart updates");
+
+      // use old mass velocity values
+      xm_dot = xm_dot_last;
+      ym_dot = ym_dot_last;
+      zm_dot = zm_dot_last;
+
+      // calculate new mass position given these velocities
+      xm += xm_dot*dt;
+      ym += ym_dot*dt;
+      zm += zm_dot*dt;
+
+      // use old robot velocity values
+      xc_dot = xc_dot_last;
+      zc_dot = zc_dot_last;
+      
+      // calculate new robot position given these velocities
+      xc += xc_dot*dt;
+      zc += zc_dot*dt;
+      
+      // use old string length velocity value
+      r_dot = r_dot_last;
+      
+      // calculate new string length based on this velocity
       r += r_dot*dt;
 
       // assign various components of system state
@@ -182,7 +281,7 @@ public:
       state.r_dot = r_dot;
 
       // publish system state
-      state_pub.publish(state);
+      pub.publish(state);
     }
   }
 
