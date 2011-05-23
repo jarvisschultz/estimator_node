@@ -11,6 +11,7 @@
 
   <depend package="roscpp"/>
   <depend package="puppeteer_msgs"/>
+  <depend package="visualization_msgs"/>
 </package>
 
 

@@ -19,6 +19,8 @@
 #include <puppeteer_msgs/State.h>
 #include <puppeteer_msgs/position_request.h>
 
+#include <visualization_msgs/Marker.h>
+
 #include <math.h>
 
 //---------------------------------------------------------------------------
@@ -34,13 +36,14 @@ class StateEstimator {
 
 private:
   ros::NodeHandle n_;
-  ros::Subscriber sub;
-  ros::Publisher pub;
+  ros::Subscriber tracker_sub;
+  ros::Publisher state_pub;
+  ros::Publisher marker_pub;
   ros::Time t_now, t_last;
-  ros::ServiceClient client;
+  ros::ServiceClient position_request_client;
 
   puppeteer_msgs::State state;  // current and previous system states
-  puppeteer_msgs::position_request srv;
+  puppeteer_msgs::position_request position_request_srv;
 
   bool error_m;
   bool error_c;
@@ -54,11 +57,15 @@ private:
   float th_dot, th_dot_last;
   float dt;
 
+  visualization_msgs::Marker mass_marker;
+  visualization_msgs::Marker cart_marker;
+
 public:
   StateEstimator() {
-    sub = n_.subscribe("/object1_position", 1, &StateEstimator::trackercb, this);
-    pub = n_.advertise<puppeteer_msgs::State> ("system_state", 100);
-    client = n_.serviceClient<puppeteer_msgs::position_request>("position_request");
+    tracker_sub = n_.subscribe("/object1_position", 1, &StateEstimator::trackercb, this);
+    state_pub = n_.advertise<puppeteer_msgs::State> ("system_state", 100);
+    marker_pub = n_.advertise<visualization_msgs::Marker>("visualization_markers", 1);
+    position_request_client = n_.serviceClient<puppeteer_msgs::position_request>("position_request");
     t_now = ros::Time::now();
 
     // initialize communication error parameters to true for safety
@@ -76,23 +83,53 @@ public:
     th_dot = 0.0; th_dot_last = 0.0;
 
     dt = 0.0;
+
+    // set marker properties for mass_marker
+    mass_marker.header.frame_id = "/openni_depth_optical_frame";
+    mass_marker.ns = "mass_marker";
+    mass_marker.id = 0;
+    mass_marker.type = visualization_msgs::Marker::SPHERE;
+    mass_marker.scale.x = 0.05;
+    mass_marker.scale.y = 0.05;
+    mass_marker.scale.z = 0.05;
+    mass_marker.color.r = 1.0f;
+    mass_marker.color.g = 0.0f;
+    mass_marker.color.b = 0.0f;
+    mass_marker.color.a = 1.0;
+    mass_marker.lifetime = ros::Duration();
+
+    // set market properties for cart_marker
+    cart_marker.header.frame_id = "/openni_depth_optical_frame";
+    cart_marker.ns = "cart_marker";
+    cart_marker.id = 0;
+    cart_marker.type = visualization_msgs::Marker::CUBE;
+    cart_marker.scale.x = 0.15;
+    cart_marker.scale.y = 0.15;
+    cart_marker.scale.z = 0.15;
+    cart_marker.color.r = 0.0f;
+    cart_marker.color.g = 1.0f;
+    cart_marker.color.b = 0.0f;
+    cart_marker.color.a = 1.0;
+    cart_marker.lifetime = ros::Duration();
   }
 
   void trackercb(const puppeteer_msgs::PointPlus &point) {
+    ROS_DEBUG("Entered tracker callback");
+    
     // get error flag from object tracker data
     error_m = point.error;
 
     // request robot position
-    srv.request.robot_index = 2;  // hardcoding this for now
-    srv.request.type = 'w';
-    srv.request.Vleft = 0.0;
-    srv.request.Vright = 0.0;
-    srv.request.Vtop = 0.0;
-    srv.request.div = 0;
+    position_request_srv.request.robot_index = 2;  // hardcoding this for now
+    position_request_srv.request.type = 'w';
+    position_request_srv.request.Vleft = 0.0;
+    position_request_srv.request.Vright = 0.0;
+    position_request_srv.request.Vtop = 0.0;
+    position_request_srv.request.div = 0;
 
     // call service and store error flag
-    if(client.call(srv)) {
-      error_c = srv.response.error;
+    if(position_request_client.call(position_request_srv)) {
+      error_c = position_request_srv.response.error;
     }
     // print error if the service call failed (not the same as a successful service call with a bad reply)
     else {
@@ -131,9 +168,9 @@ public:
       zm = point.z;
 
       // get new robot position data
-      xc = srv.response.xc;
-      zc = srv.response.zc;
-      th = srv.response.th;
+      xc = position_request_srv.response.xc;
+      zc = position_request_srv.response.zc;
+      th = position_request_srv.response.th;
 
       // calculate string length
       // ignore z dimension for now and assume planar motion in x and y
@@ -158,7 +195,7 @@ public:
       state.r_dot = r_dot;
 
       // publish system state
-      pub.publish(state);
+      state_pub.publish(state);
     }
 
     // we missed the mass update but got the robot update
@@ -176,9 +213,9 @@ public:
       zm += zm_dot*dt;
 
       // get new robot position data
-      xc = srv.response.xc;
-      zc = srv.response.zc;
-      th = srv.response.th;
+      xc = position_request_srv.response.xc;
+      zc = position_request_srv.response.zc;
+      th = position_request_srv.response.th;
 
       // calculate string length
       // ignore z dimension for now and assume planar motion in x and y
@@ -200,7 +237,7 @@ public:
       state.r_dot = r_dot;
 
       // publish system state
-      pub.publish(state);
+      state_pub.publish(state);
     }
 
     // we missed the robot update but got the mass update
@@ -240,7 +277,31 @@ public:
       state.r_dot = r_dot;
 
       // publish system state
-      pub.publish(state);
+      state_pub.publish(state);
+
+      // set mass_marker details
+      mass_marker.pose.position.x = xm;
+      mass_marker.pose.position.y = ym;
+      mass_marker.pose.position.z = zm;
+      mass_marker.pose.orientation.x = 0.0;
+      mass_marker.pose.orientation.y = 0.0;
+      mass_marker.pose.orientation.z = 0.0;
+      mass_marker.pose.orientation.w = 1.0;
+      mass_marker.header.stamp = t_now;
+
+      // set cart_marker details
+      cart_marker.pose.position.x = xc;
+      cart_marker.pose.position.y = 0;
+      cart_marker.pose.position.z = 0;
+      cart_marker.pose.orientation.x = 0.0;
+      cart_marker.pose.orientation.y = 0.0;
+      cart_marker.pose.orientation.z = 0.0;
+      cart_marker.pose.orientation.w = 1.0;
+      cart_marker.header.stamp = t_now;
+
+      // publish markers
+      marker_pub.publish(mass_marker);
+      marker_pub.publish(cart_marker);
     }
     // otherwise, we missed both robot and mass state updates
     else {
@@ -281,8 +342,10 @@ public:
       state.r_dot = r_dot;
 
       // publish system state
-      pub.publish(state);
+      state_pub.publish(state);
     }
+
+    ROS_DEBUG("Leaving tracker callback");
   }
 
 
