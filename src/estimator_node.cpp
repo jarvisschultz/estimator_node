@@ -196,6 +196,32 @@ public:
 
       // publish system state
       state_pub.publish(state);
+
+      
+      // set mass_marker details
+      mass_marker.pose.position.x = xm;
+      mass_marker.pose.position.y = ym;
+      mass_marker.pose.position.z = zm;
+      mass_marker.pose.orientation.x = 0.0;
+      mass_marker.pose.orientation.y = 0.0;
+      mass_marker.pose.orientation.z = 0.0;
+      mass_marker.pose.orientation.w = 1.0;
+      mass_marker.header.stamp = t_now;
+
+      // set cart_marker details
+      cart_marker.pose.position.x = xc;
+      cart_marker.pose.position.y = 0;
+      cart_marker.pose.position.z = 0;
+      cart_marker.pose.orientation.x = 0.0;
+      cart_marker.pose.orientation.y = 0.0;
+      cart_marker.pose.orientation.z = 0.0;
+      cart_marker.pose.orientation.w = 1.0;
+      cart_marker.header.stamp = t_now;
+
+      // publish markers
+      marker_pub.publish(mass_marker);
+      marker_pub.publish(cart_marker);
+
     }
 
     // we missed the mass update but got the robot update
@@ -238,6 +264,32 @@ public:
 
       // publish system state
       state_pub.publish(state);
+
+      
+      // set mass_marker details
+      mass_marker.pose.position.x = xm;
+      mass_marker.pose.position.y = ym;
+      mass_marker.pose.position.z = zm;
+      mass_marker.pose.orientation.x = 0.0;
+      mass_marker.pose.orientation.y = 0.0;
+      mass_marker.pose.orientation.z = 0.0;
+      mass_marker.pose.orientation.w = 1.0;
+      mass_marker.header.stamp = t_now;
+
+      // set cart_marker details
+      cart_marker.pose.position.x = xc;
+      cart_marker.pose.position.y = 0;
+      cart_marker.pose.position.z = 0;
+      cart_marker.pose.orientation.x = 0.0;
+      cart_marker.pose.orientation.y = 0.0;
+      cart_marker.pose.orientation.z = 0.0;
+      cart_marker.pose.orientation.w = 1.0;
+      cart_marker.header.stamp = t_now;
+
+      // publish markers
+      marker_pub.publish(mass_marker);
+      marker_pub.publish(cart_marker);
+
     }
 
     // we missed the robot update but got the mass update
