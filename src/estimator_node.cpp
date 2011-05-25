@@ -158,21 +158,18 @@ public:
     th_last = th;
     th_dot_last = th_dot;
 
-<<<<<<< HEAD
     // check if the operating_condition parameter exists and set its value
     int operating_condition = 0;
-    if(ros::param::has("operating_condition"))
-      {
-	ros::param::get("/operating_condition", operating_condition);
-      }
-    else
-      {
-	ROS_WARN("Cannot Find Parameter: operating_condition");
-	ROS_INFO("Setting operating_condition to IDLE");
-	ros::param::set("/operating_condition", 0);
+    if(ros::param::has("operating_condition")) {
+      ros::param::get("/operating_condition", operating_condition);
+    }
+    else {
+      ROS_WARN("Cannot Find Parameter: operating_condition");
+      ROS_INFO("Setting operating_condition to IDLE");
+      ros::param::set("/operating_condition", 0);
       
-	return;
-      }
+      return;
+    }
 
     // check to see if we are in calibrate or run state
     if(operating_condition == 1 || operating_condition == 2) {
@@ -186,9 +183,9 @@ public:
 	zm = point.z;
 
 	// get new robot position data
-	xc = srv.response.xc;
-	zc = srv.response.zc;
-	th = srv.response.th;
+	xc = position_request_srv.response.xc;
+	zc = position_request_srv.response.zc;
+	th = position_request_srv.response.th;
 
 	// calculate string length
 	// ignore z dimension for now and assume planar motion in x and y
@@ -213,7 +210,31 @@ public:
 	state.r_dot = r_dot;
 
 	// publish system state
-	pub.publish(state);
+	state_pub.publish(state);
+
+	// set mass_marker details
+	mass_marker.pose.position.x = xm;
+	mass_marker.pose.position.y = ym;
+	mass_marker.pose.position.z = zm;
+	mass_marker.pose.orientation.x = 0.0;
+	mass_marker.pose.orientation.y = 0.0;
+	mass_marker.pose.orientation.z = 0.0;
+	mass_marker.pose.orientation.w = 1.0;
+	mass_marker.header.stamp = t_now;
+
+	// set cart_marker details
+	cart_marker.pose.position.x = xc;
+	cart_marker.pose.position.y = 0;
+	cart_marker.pose.position.z = 0;
+	cart_marker.pose.orientation.x = 0.0;
+	cart_marker.pose.orientation.y = 0.0;
+	cart_marker.pose.orientation.z = 0.0;
+	cart_marker.pose.orientation.w = 1.0;
+	cart_marker.header.stamp = t_now;
+
+	// publish markers
+	marker_pub.publish(mass_marker);
+	marker_pub.publish(cart_marker);
       }
 
       // we missed the mass update but got the robot update
@@ -231,9 +252,9 @@ public:
 	zm += zm_dot*dt;
 
 	// get new robot position data
-	xc = srv.response.xc;
-	zc = srv.response.zc;
-	th = srv.response.th;
+	xc = position_request_srv.response.xc;
+	zc = position_request_srv.response.zc;
+	th = position_request_srv.response.th;
 
 	// calculate string length
 	// ignore z dimension for now and assume planar motion in x and y
@@ -255,151 +276,36 @@ public:
 	state.r_dot = r_dot;
 
 	// publish system state
-	pub.publish(state);
+	state_pub.publish(state);
+
+	// set mass_marker details
+	mass_marker.pose.position.x = xm;
+	mass_marker.pose.position.y = ym;
+	mass_marker.pose.position.z = zm;
+	mass_marker.pose.orientation.x = 0.0;
+	mass_marker.pose.orientation.y = 0.0;
+	mass_marker.pose.orientation.z = 0.0;
+	mass_marker.pose.orientation.w = 1.0;
+	mass_marker.header.stamp = t_now;
+
+	// set cart_marker details
+	cart_marker.pose.position.x = xc;
+	cart_marker.pose.position.y = 0;
+	cart_marker.pose.position.z = 0;
+	cart_marker.pose.orientation.x = 0.0;
+	cart_marker.pose.orientation.y = 0.0;
+	cart_marker.pose.orientation.z = 0.0;
+	cart_marker.pose.orientation.w = 1.0;
+	cart_marker.header.stamp = t_now;
+
+	// publish markers
+	marker_pub.publish(mass_marker);
+	marker_pub.publish(cart_marker);
       }
 
       // we missed the robot update but got the mass update
       else if(error_m == false && error_c == true) {
 	ROS_WARN("Missed cart update");
-=======
-    // did we get good mass position data from the object tracker and robot?
-    if(error_m == false && error_c == false) {
-      ROS_DEBUG("Successful update to mass and cart");
-
-      // get new mass position data
-      xm = point.x;
-      ym = point.y;
-      zm = point.z;
-
-      // get new robot position data
-      xc = position_request_srv.response.xc;
-      zc = position_request_srv.response.zc;
-      th = position_request_srv.response.th;
-
-      // calculate string length
-      // ignore z dimension for now and assume planar motion in x and y
-      r = sqrt(powf((xc-xm),2)+powf((ym),2));
-
-      // calculate new velocities
-      xm_dot = (xm-xm_last)/dt;
-      ym_dot = (ym-ym_last)/dt;
-      zm_dot = (zm-zm_last)/dt;
-      xc_dot = (xc-xc_last)/dt;
-      zc_dot = (zc-zc_last)/dt;
-      r_dot = (r-r_last)/dt;
-      
-      // assign various components of system state
-      state.xm = xm;
-      state.ym = ym;
-      state.xc = xc;
-      state.r = r;
-      state.xm_dot = xm_dot;
-      state.ym_dot = xc_dot;
-      state.xc_dot = xc_dot;
-      state.r_dot = r_dot;
-
-      // publish system state
-      state_pub.publish(state);
-
-      
-      // set mass_marker details
-      mass_marker.pose.position.x = xm;
-      mass_marker.pose.position.y = ym;
-      mass_marker.pose.position.z = zm;
-      mass_marker.pose.orientation.x = 0.0;
-      mass_marker.pose.orientation.y = 0.0;
-      mass_marker.pose.orientation.z = 0.0;
-      mass_marker.pose.orientation.w = 1.0;
-      mass_marker.header.stamp = t_now;
-
-      // set cart_marker details
-      cart_marker.pose.position.x = xc;
-      cart_marker.pose.position.y = 0;
-      cart_marker.pose.position.z = 0;
-      cart_marker.pose.orientation.x = 0.0;
-      cart_marker.pose.orientation.y = 0.0;
-      cart_marker.pose.orientation.z = 0.0;
-      cart_marker.pose.orientation.w = 1.0;
-      cart_marker.header.stamp = t_now;
-
-      // publish markers
-      marker_pub.publish(mass_marker);
-      marker_pub.publish(cart_marker);
-
-    }
-
-    // we missed the mass update but got the robot update
-    else if(error_m == true && error_c == false) {
-      ROS_WARN("Missed mass update");
-
-      // use old mass velocity values
-      xm_dot = xm_dot_last;
-      ym_dot = ym_dot_last;
-      zm_dot = zm_dot_last;
-
-      // calculate new mass position given these velocities
-      xm += xm_dot*dt;
-      ym += ym_dot*dt;
-      zm += zm_dot*dt;
-
-      // get new robot position data
-      xc = position_request_srv.response.xc;
-      zc = position_request_srv.response.zc;
-      th = position_request_srv.response.th;
-
-      // calculate string length
-      // ignore z dimension for now and assume planar motion in x and y
-      r = sqrt(powf((xc-xm),2)+powf((ym),2));
-
-      // calculate new velocities
-      xc_dot = (xc-xc_last)/dt;
-      zc_dot = (zc-zc_last)/dt;
-      r_dot = (r-r_last)/dt;
-            
-      // assign various components of system state
-      state.xm = xm;
-      state.ym = ym;
-      state.xc = xc;
-      state.r = r;
-      state.xm_dot = xm_dot;
-      state.ym_dot = xc_dot;
-      state.xc_dot = xc_dot;
-      state.r_dot = r_dot;
-
-      // publish system state
-      state_pub.publish(state);
-
-      
-      // set mass_marker details
-      mass_marker.pose.position.x = xm;
-      mass_marker.pose.position.y = ym;
-      mass_marker.pose.position.z = zm;
-      mass_marker.pose.orientation.x = 0.0;
-      mass_marker.pose.orientation.y = 0.0;
-      mass_marker.pose.orientation.z = 0.0;
-      mass_marker.pose.orientation.w = 1.0;
-      mass_marker.header.stamp = t_now;
-
-      // set cart_marker details
-      cart_marker.pose.position.x = xc;
-      cart_marker.pose.position.y = 0;
-      cart_marker.pose.position.z = 0;
-      cart_marker.pose.orientation.x = 0.0;
-      cart_marker.pose.orientation.y = 0.0;
-      cart_marker.pose.orientation.z = 0.0;
-      cart_marker.pose.orientation.w = 1.0;
-      cart_marker.header.stamp = t_now;
-
-      // publish markers
-      marker_pub.publish(mass_marker);
-      marker_pub.publish(cart_marker);
-
-    }
-
-    // we missed the robot update but got the mass update
-    else if(error_m == false && error_c == true) {
-      ROS_WARN("Missed cart update");
->>>>>>> 16d7a5b3f638bb48786756aeee24635fad3e5b6c
       
 	// get new mass position data
 	xm = point.x;
@@ -414,7 +320,6 @@ public:
 	xc += xc_dot*dt;
 	zc += zc_dot*dt;
       
-<<<<<<< HEAD
 	// calculate string length
 	// ignore z dimension for now and assume planar motion in x and y
 	r = sqrt(powf((xc-xm),2)+powf((ym),2));
@@ -435,7 +340,7 @@ public:
 	state.r_dot = r_dot;
 
 	// publish system state
-	pub.publish(state);
+	state_pub.publish(state);
       }
       // otherwise, we missed both robot and mass state updates
       else {
@@ -454,82 +359,15 @@ public:
 	// use old robot velocity values
 	xc_dot = xc_dot_last;
 	zc_dot = zc_dot_last;
-=======
-      // calculate string length
-      // ignore z dimension for now and assume planar motion in x and y
-      r = sqrt(powf((xc-xm),2)+powf((ym),2));
 
-      // calculate new velocities
-      xm_dot = (xm-xm_last)/dt;
-      ym_dot = (ym-ym_last)/dt;
-      zm_dot = (zm-zm_last)/dt;
+	// calculate string length
+	// ignore z dimension for now and assume planar motion in x and y
+	r = sqrt(powf((xc-xm),2)+powf((ym),2));
 
-      // assign various components of system state
-      state.xm = xm;
-      state.ym = ym;
-      state.xc = xc;
-      state.r = r;
-      state.xm_dot = xm_dot;
-      state.ym_dot = xc_dot;
-      state.xc_dot = xc_dot;
-      state.r_dot = r_dot;
-
-      // publish system state
-      state_pub.publish(state);
-
-      // set mass_marker details
-      mass_marker.pose.position.x = xm;
-      mass_marker.pose.position.y = ym;
-      mass_marker.pose.position.z = zm;
-      mass_marker.pose.orientation.x = 0.0;
-      mass_marker.pose.orientation.y = 0.0;
-      mass_marker.pose.orientation.z = 0.0;
-      mass_marker.pose.orientation.w = 1.0;
-      mass_marker.header.stamp = t_now;
-
-      // set cart_marker details
-      cart_marker.pose.position.x = xc;
-      cart_marker.pose.position.y = 0;
-      cart_marker.pose.position.z = 0;
-      cart_marker.pose.orientation.x = 0.0;
-      cart_marker.pose.orientation.y = 0.0;
-      cart_marker.pose.orientation.z = 0.0;
-      cart_marker.pose.orientation.w = 1.0;
-      cart_marker.header.stamp = t_now;
-
-      // publish markers
-      marker_pub.publish(mass_marker);
-      marker_pub.publish(cart_marker);
-    }
-    // otherwise, we missed both robot and mass state updates
-    else {
-      ROS_WARN("Missed both mass and cart updates");
-
-      // use old mass velocity values
-      xm_dot = xm_dot_last;
-      ym_dot = ym_dot_last;
-      zm_dot = zm_dot_last;
-
-      // calculate new mass position given these velocities
-      xm += xm_dot*dt;
-      ym += ym_dot*dt;
-      zm += zm_dot*dt;
-
-      // use old robot velocity values
-      xc_dot = xc_dot_last;
-      zc_dot = zc_dot_last;
->>>>>>> 16d7a5b3f638bb48786756aeee24635fad3e5b6c
-      
-	// calculate new robot position given these velocities
-	xc += xc_dot*dt;
-	zc += zc_dot*dt;
-      
-	// use old string length velocity value
-	r_dot = r_dot_last;
-      
-<<<<<<< HEAD
-	// calculate new string length based on this velocity
-	r += r_dot*dt;
+	// calculate new velocities
+	xm_dot = (xm-xm_last)/dt;
+	ym_dot = (ym-ym_last)/dt;
+	zm_dot = (zm-zm_last)/dt;
 
 	// assign various components of system state
 	state.xm = xm;
@@ -542,7 +380,31 @@ public:
 	state.r_dot = r_dot;
 
 	// publish system state
-	pub.publish(state);
+	state_pub.publish(state);
+
+	// set mass_marker details
+	mass_marker.pose.position.x = xm;
+	mass_marker.pose.position.y = ym;
+	mass_marker.pose.position.z = zm;
+	mass_marker.pose.orientation.x = 0.0;
+	mass_marker.pose.orientation.y = 0.0;
+	mass_marker.pose.orientation.z = 0.0;
+	mass_marker.pose.orientation.w = 1.0;
+	mass_marker.header.stamp = t_now;
+
+	// set cart_marker details
+	cart_marker.pose.position.x = xc;
+	cart_marker.pose.position.y = 0;
+	cart_marker.pose.position.z = 0;
+	cart_marker.pose.orientation.x = 0.0;
+	cart_marker.pose.orientation.y = 0.0;
+	cart_marker.pose.orientation.z = 0.0;
+	cart_marker.pose.orientation.w = 1.0;
+	cart_marker.header.stamp = t_now;
+
+	// publish markers
+	marker_pub.publish(mass_marker);
+	marker_pub.publish(cart_marker);
       }
     }
     
@@ -554,6 +416,7 @@ public:
     // are we in emergency stop condition?
     else if(operating_condition == 4) {
       // did we get an emergency stop request?
+      static bool emergency_flag = false;
       if(operating_condition == 4 && emergency_flag == false) {
 	ROS_WARN("Emergency Stop Requested");
 	emergency_flag = true;
@@ -563,7 +426,7 @@ public:
     // otherwise something terrible has happened
     else {
       ROS_ERROR("Invalid value for operating_condition");
-=======
+
       // calculate new string length based on this velocity
       r += r_dot*dt;
 
@@ -579,88 +442,85 @@ public:
 
       // publish system state
       state_pub.publish(state);
->>>>>>> 16d7a5b3f638bb48786756aeee24635fad3e5b6c
     }
 
     ROS_DEBUG("Leaving tracker callback");
   }
-}
 
+// void SetState(int estimate_flag, float x, float y, float th, float dt)
+// {
+//   /* So this function takes in a new value for the pose of the */
+//   /* robot, and a flag that indicates what parameters need to be */
+//   /* estimated.  If the robot successfully returned new pose */
+//   /* values, we only need to estimate the velocities of the robot; */
+//   /* if not we need to estimate the whole state. */
 
-  // void SetState(int estimate_flag, float x, float y, float th, float dt)
-  // {
-  //   /* So this function takes in a new value for the pose of the */
-  //   /* robot, and a flag that indicates what parameters need to be */
-  //   /* estimated.  If the robot successfully returned new pose */
-  //   /* values, we only need to estimate the velocities of the robot; */
-  //   /* if not we need to estimate the whole state. */
+//   // Was it a successful read?
+//   if(estimate_flag == 1)
+//     {
+// 	// Just estimate velocities
+// 	x_pos_last = x_pos;
+// 	y_pos_last = y_pos;
+// 	theta_last = theta;
 
-  //   // Was it a successful read?
-  //   if(estimate_flag == 1)
-  //     {
-  // 	// Just estimate velocities
-  // 	x_pos_last = x_pos;
-  // 	y_pos_last = y_pos;
-  // 	theta_last = theta;
+// 	x_pos = x;
+// 	y_pos = y;
+// 	theta = th;
 
-  // 	x_pos = x;
-  // 	y_pos = y;
-  // 	theta = th;
+//      	x_dot = (x_pos-x_pos_last)/dt;
+// 	y_dot = (y_pos-y_pos_last)/dt;
+// 	// Need to be careful with angular velocity:
+// 	omega = GetAngularVelocity(theta_last, theta, dt);
+//     }
+//   else
+//     {
+// 	// Need to estimate the whole state:
+// 	x_pos_last = x_pos;
+// 	y_pos_last = y_pos;
+// 	theta_last = theta;
 
-  //      	x_dot = (x_pos-x_pos_last)/dt;
-  // 	y_dot = (y_pos-y_pos_last)/dt;
-  // 	// Need to be careful with angular velocity:
-  // 	omega = GetAngularVelocity(theta_last, theta, dt);
-  //     }
-  //   else
-  //     {
-  // 	// Need to estimate the whole state:
-  // 	x_pos_last = x_pos;
-  // 	y_pos_last = y_pos;
-  // 	theta_last = theta;
-
-  // 	x_pos = x_pos_last+x_dot*dt;
-  // 	y_pos = y_pos_last+y_dot*dt;
-  // 	theta = theta_last+omega*dt;
-  //     }
+// 	x_pos = x_pos_last+x_dot*dt;
+// 	y_pos = y_pos_last+y_dot*dt;
+// 	theta = theta_last+omega*dt;
+//     }
     
-  //   return;
-  // }
+//   return;
+// }
 
 
-  // float GetAngularVelocity(float theta_old, float theta_new, float dt)
-  // {
-  //   /* This function returns the estimated angluar velocity of the
-  //    * robot given two different angles and a timestep, it performs
-  //    * the angular rollover logic*/
+// float GetAngularVelocity(float theta_old, float theta_new, float dt)
+// {
+//   /* This function returns the estimated angluar velocity of the
+//    * robot given two different angles and a timestep, it performs
+//    * the angular rollover logic*/
 
-  //   if (theta_new >= theta_old && theta_new-theta_old <= M_PI)
-  //     {
-  // 	return (theta_new-theta_old)/dt;
-  //     }
-  //   else if (theta_new < theta_old && theta_old-theta_new <= M_PI)
-  //     {
-  // 	return (theta_new-theta_old)/dt;
-  //     }
-  //   else
-  //     {
-  // 	if(theta_new >= theta_old)
-  // 	  {
-  // 	    return -(theta_old+2.0*M_PI-theta_new)/dt;
-  // 	  }
-  // 	else
-  // 	  {
-  // 	    return (2.0*M_PI-theta_old+theta_new)/dt;
-  // 	  }
-  //     }
-  //   return 0;
-  // }
-};
+//   if (theta_new >= theta_old && theta_new-theta_old <= M_PI)
+//     {
+// 	return (theta_new-theta_old)/dt;
+//     }
+//   else if (theta_new < theta_old && theta_old-theta_new <= M_PI)
+//     {
+// 	return (theta_new-theta_old)/dt;
+//     }
+//   else
+//     {
+// 	if(theta_new >= theta_old)
+// 	  {
+// 	    return -(theta_old+2.0*M_PI-theta_new)/dt;
+// 	  }
+// 	else
+// 	  {
+// 	    return (2.0*M_PI-theta_old+theta_new)/dt;
+// 	  }
+//     }
+//   return 0;
+// }
+  };
 
 
-//---------------------------------------------------------------------------
+//--------------------------------------------------------------------------
 // Main
-//---------------------------------------------------------------------------
+//--------------------------------------------------------------------------
 
 int main(int argc, char **argv)
 {
