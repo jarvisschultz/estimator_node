@@ -158,6 +158,110 @@ public:
     th_last = th;
     th_dot_last = th_dot;
 
+<<<<<<< HEAD
+    // check if the operating_condition parameter exists and set its value
+    int operating_condition = 0;
+    if(ros::param::has("operating_condition"))
+      {
+	ros::param::get("/operating_condition", operating_condition);
+      }
+    else
+      {
+	ROS_WARN("Cannot Find Parameter: operating_condition");
+	ROS_INFO("Setting operating_condition to IDLE");
+	ros::param::set("/operating_condition", 0);
+      
+	return;
+      }
+
+    // check to see if we are in calibrate or run state
+    if(operating_condition == 1 || operating_condition == 2) {
+      // did we get good mass position data from the object tracker and robot?
+      if(error_m == false && error_c == false) {
+	ROS_DEBUG("Successful update to mass and cart");
+
+	// get new mass position data
+	xm = point.x;
+	ym = point.y;
+	zm = point.z;
+
+	// get new robot position data
+	xc = srv.response.xc;
+	zc = srv.response.zc;
+	th = srv.response.th;
+
+	// calculate string length
+	// ignore z dimension for now and assume planar motion in x and y
+	r = sqrt(powf((xc-xm),2)+powf((ym),2));
+
+	// calculate new velocities
+	xm_dot = (xm-xm_last)/dt;
+	ym_dot = (ym-ym_last)/dt;
+	zm_dot = (zm-zm_last)/dt;
+	xc_dot = (xc-xc_last)/dt;
+	zc_dot = (zc-zc_last)/dt;
+	r_dot = (r-r_last)/dt;
+      
+	// assign various components of system state
+	state.xm = xm;
+	state.ym = ym;
+	state.xc = xc;
+	state.r = r;
+	state.xm_dot = xm_dot;
+	state.ym_dot = xc_dot;
+	state.xc_dot = xc_dot;
+	state.r_dot = r_dot;
+
+	// publish system state
+	pub.publish(state);
+      }
+
+      // we missed the mass update but got the robot update
+      else if(error_m == true && error_c == false) {
+	ROS_WARN("Missed mass update");
+
+	// use old mass velocity values
+	xm_dot = xm_dot_last;
+	ym_dot = ym_dot_last;
+	zm_dot = zm_dot_last;
+
+	// calculate new mass position given these velocities
+	xm += xm_dot*dt;
+	ym += ym_dot*dt;
+	zm += zm_dot*dt;
+
+	// get new robot position data
+	xc = srv.response.xc;
+	zc = srv.response.zc;
+	th = srv.response.th;
+
+	// calculate string length
+	// ignore z dimension for now and assume planar motion in x and y
+	r = sqrt(powf((xc-xm),2)+powf((ym),2));
+
+	// calculate new velocities
+	xc_dot = (xc-xc_last)/dt;
+	zc_dot = (zc-zc_last)/dt;
+	r_dot = (r-r_last)/dt;
+            
+	// assign various components of system state
+	state.xm = xm;
+	state.ym = ym;
+	state.xc = xc;
+	state.r = r;
+	state.xm_dot = xm_dot;
+	state.ym_dot = xc_dot;
+	state.xc_dot = xc_dot;
+	state.r_dot = r_dot;
+
+	// publish system state
+	pub.publish(state);
+      }
+
+      // we missed the robot update but got the mass update
+      else if(error_m == false && error_c == true) {
+	ROS_WARN("Missed cart update");
+=======
     // did we get good mass position data from the object tracker and robot?
     if(error_m == false && error_c == false) {
       ROS_DEBUG("Successful update to mass and cart");
@@ -295,20 +399,62 @@ public:
     // we missed the robot update but got the mass update
     else if(error_m == false && error_c == true) {
       ROS_WARN("Missed cart update");
+>>>>>>> 16d7a5b3f638bb48786756aeee24635fad3e5b6c
       
-      // get new mass position data
-      xm = point.x;
-      ym = point.y;
-      zm = point.z;
+	// get new mass position data
+	xm = point.x;
+	ym = point.y;
+	zm = point.z;
 
-      // use old robot velocity values
-      xc_dot = xc_dot_last;
-      zc_dot = zc_dot_last;
+	// use old robot velocity values
+	xc_dot = xc_dot_last;
+	zc_dot = zc_dot_last;
       
-      // calculate new robot position given these velocities
-      xc += xc_dot*dt;
-      zc += zc_dot*dt;
+	// calculate new robot position given these velocities
+	xc += xc_dot*dt;
+	zc += zc_dot*dt;
       
+<<<<<<< HEAD
+	// calculate string length
+	// ignore z dimension for now and assume planar motion in x and y
+	r = sqrt(powf((xc-xm),2)+powf((ym),2));
+
+	// calculate new velocities
+	xm_dot = (xm-xm_last)/dt;
+	ym_dot = (ym-ym_last)/dt;
+	zm_dot = (zm-zm_last)/dt;
+
+	// assign various components of system state
+	state.xm = xm;
+	state.ym = ym;
+	state.xc = xc;
+	state.r = r;
+	state.xm_dot = xm_dot;
+	state.ym_dot = xc_dot;
+	state.xc_dot = xc_dot;
+	state.r_dot = r_dot;
+
+	// publish system state
+	pub.publish(state);
+      }
+      // otherwise, we missed both robot and mass state updates
+      else {
+	ROS_WARN("Missed both mass and cart updates");
+
+	// use old mass velocity values
+	xm_dot = xm_dot_last;
+	ym_dot = ym_dot_last;
+	zm_dot = zm_dot_last;
+
+	// calculate new mass position given these velocities
+	xm += xm_dot*dt;
+	ym += ym_dot*dt;
+	zm += zm_dot*dt;
+
+	// use old robot velocity values
+	xc_dot = xc_dot_last;
+	zc_dot = zc_dot_last;
+=======
       // calculate string length
       // ignore z dimension for now and assume planar motion in x and y
       r = sqrt(powf((xc-xm),2)+powf((ym),2));
@@ -372,14 +518,52 @@ public:
       // use old robot velocity values
       xc_dot = xc_dot_last;
       zc_dot = zc_dot_last;
+>>>>>>> 16d7a5b3f638bb48786756aeee24635fad3e5b6c
       
-      // calculate new robot position given these velocities
-      xc += xc_dot*dt;
-      zc += zc_dot*dt;
+	// calculate new robot position given these velocities
+	xc += xc_dot*dt;
+	zc += zc_dot*dt;
       
-      // use old string length velocity value
-      r_dot = r_dot_last;
+	// use old string length velocity value
+	r_dot = r_dot_last;
       
+<<<<<<< HEAD
+	// calculate new string length based on this velocity
+	r += r_dot*dt;
+
+	// assign various components of system state
+	state.xm = xm;
+	state.ym = ym;
+	state.xc = xc;
+	state.r = r;
+	state.xm_dot = xm_dot;
+	state.ym_dot = xc_dot;
+	state.xc_dot = xc_dot;
+	state.r_dot = r_dot;
+
+	// publish system state
+	pub.publish(state);
+      }
+    }
+    
+    // are we in idle or stop condition?
+    else if(operating_condition == 0 || operating_condition == 3) {
+      ROS_DEBUG("Estimator node is idle due to operating condition");
+    } 
+    
+    // are we in emergency stop condition?
+    else if(operating_condition == 4) {
+      // did we get an emergency stop request?
+      if(operating_condition == 4 && emergency_flag == false) {
+	ROS_WARN("Emergency Stop Requested");
+	emergency_flag = true;
+      }
+    }
+    
+    // otherwise something terrible has happened
+    else {
+      ROS_ERROR("Invalid value for operating_condition");
+=======
       // calculate new string length based on this velocity
       r += r_dot*dt;
 
@@ -395,10 +579,12 @@ public:
 
       // publish system state
       state_pub.publish(state);
+>>>>>>> 16d7a5b3f638bb48786756aeee24635fad3e5b6c
     }
 
     ROS_DEBUG("Leaving tracker callback");
   }
+}
 
 
   // void SetState(int estimate_flag, float x, float y, float th, float dt)
