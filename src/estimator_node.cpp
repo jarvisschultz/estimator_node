@@ -57,9 +57,6 @@ private:
   float th_dot, th_dot_last;
   float dt;
 
-  visualization_msgs::Marker mass_marker;
-  visualization_msgs::Marker cart_marker;
-
 public:
   StateEstimator() {
     tracker_sub = n_.subscribe("/object1_position", 1, &StateEstimator::trackercb, this);
@@ -83,34 +80,6 @@ public:
     th_dot = 0.0; th_dot_last = 0.0;
 
     dt = 0.0;
-
-    // set marker properties for mass_marker
-    mass_marker.header.frame_id = "/openni_depth_optical_frame";
-    mass_marker.ns = "mass_marker";
-    mass_marker.id = 0;
-    mass_marker.type = visualization_msgs::Marker::SPHERE;
-    mass_marker.scale.x = 0.05;
-    mass_marker.scale.y = 0.05;
-    mass_marker.scale.z = 0.05;
-    mass_marker.color.r = 1.0f;
-    mass_marker.color.g = 0.0f;
-    mass_marker.color.b = 0.0f;
-    mass_marker.color.a = 1.0;
-    mass_marker.lifetime = ros::Duration();
-
-    // set market properties for cart_marker
-    cart_marker.header.frame_id = "/openni_depth_optical_frame";
-    cart_marker.ns = "cart_marker";
-    cart_marker.id = 0;
-    cart_marker.type = visualization_msgs::Marker::CUBE;
-    cart_marker.scale.x = 0.15;
-    cart_marker.scale.y = 0.15;
-    cart_marker.scale.z = 0.15;
-    cart_marker.color.r = 0.0f;
-    cart_marker.color.g = 1.0f;
-    cart_marker.color.b = 0.0f;
-    cart_marker.color.a = 1.0;
-    cart_marker.lifetime = ros::Duration();
   }
 
   void trackercb(const puppeteer_msgs::PointPlus &point) {
@@ -211,30 +180,6 @@ public:
 
 	// publish system state
 	state_pub.publish(state);
-
-	// set mass_marker details
-	mass_marker.pose.position.x = xm;
-	mass_marker.pose.position.y = ym;
-	mass_marker.pose.position.z = zm;
-	mass_marker.pose.orientation.x = 0.0;
-	mass_marker.pose.orientation.y = 0.0;
-	mass_marker.pose.orientation.z = 0.0;
-	mass_marker.pose.orientation.w = 1.0;
-	mass_marker.header.stamp = t_now;
-
-	// set cart_marker details
-	cart_marker.pose.position.x = xc;
-	cart_marker.pose.position.y = 0;
-	cart_marker.pose.position.z = 0;
-	cart_marker.pose.orientation.x = 0.0;
-	cart_marker.pose.orientation.y = 0.0;
-	cart_marker.pose.orientation.z = 0.0;
-	cart_marker.pose.orientation.w = 1.0;
-	cart_marker.header.stamp = t_now;
-
-	// publish markers
-	marker_pub.publish(mass_marker);
-	marker_pub.publish(cart_marker);
       }
 
       // we missed the mass update but got the robot update
@@ -277,30 +222,6 @@ public:
 
 	// publish system state
 	state_pub.publish(state);
-
-	// set mass_marker details
-	mass_marker.pose.position.x = xm;
-	mass_marker.pose.position.y = ym;
-	mass_marker.pose.position.z = zm;
-	mass_marker.pose.orientation.x = 0.0;
-	mass_marker.pose.orientation.y = 0.0;
-	mass_marker.pose.orientation.z = 0.0;
-	mass_marker.pose.orientation.w = 1.0;
-	mass_marker.header.stamp = t_now;
-
-	// set cart_marker details
-	cart_marker.pose.position.x = xc;
-	cart_marker.pose.position.y = 0;
-	cart_marker.pose.position.z = 0;
-	cart_marker.pose.orientation.x = 0.0;
-	cart_marker.pose.orientation.y = 0.0;
-	cart_marker.pose.orientation.z = 0.0;
-	cart_marker.pose.orientation.w = 1.0;
-	cart_marker.header.stamp = t_now;
-
-	// publish markers
-	marker_pub.publish(mass_marker);
-	marker_pub.publish(cart_marker);
       }
 
       // we missed the robot update but got the mass update
@@ -381,30 +302,6 @@ public:
 
 	// publish system state
 	state_pub.publish(state);
-
-	// set mass_marker details
-	mass_marker.pose.position.x = xm;
-	mass_marker.pose.position.y = ym;
-	mass_marker.pose.position.z = zm;
-	mass_marker.pose.orientation.x = 0.0;
-	mass_marker.pose.orientation.y = 0.0;
-	mass_marker.pose.orientation.z = 0.0;
-	mass_marker.pose.orientation.w = 1.0;
-	mass_marker.header.stamp = t_now;
-
-	// set cart_marker details
-	cart_marker.pose.position.x = xc;
-	cart_marker.pose.position.y = 0;
-	cart_marker.pose.position.z = 0;
-	cart_marker.pose.orientation.x = 0.0;
-	cart_marker.pose.orientation.y = 0.0;
-	cart_marker.pose.orientation.z = 0.0;
-	cart_marker.pose.orientation.w = 1.0;
-	cart_marker.header.stamp = t_now;
-
-	// publish markers
-	marker_pub.publish(mass_marker);
-	marker_pub.publish(cart_marker);
       }
     }
     
@@ -426,22 +323,6 @@ public:
     // otherwise something terrible has happened
     else {
       ROS_ERROR("Invalid value for operating_condition");
-
-      // calculate new string length based on this velocity
-      r += r_dot*dt;
-
-      // assign various components of system state
-      state.xm = xm;
-      state.ym = ym;
-      state.xc = xc;
-      state.r = r;
-      state.xm_dot = xm_dot;
-      state.ym_dot = xc_dot;
-      state.xc_dot = xc_dot;
-      state.r_dot = r_dot;
-
-      // publish system state
-      state_pub.publish(state);
     }
 
     ROS_DEBUG("Leaving tracker callback");
