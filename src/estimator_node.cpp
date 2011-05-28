@@ -192,6 +192,9 @@ public:
 		state.xc_dot = xc_dot;
 		state.r_dot = r_dot;
 
+		// set time stampe
+		state.header.stamp = t_now;
+
 		// publish system state
 		state_pub.publish(state);
 	    }
@@ -234,6 +237,9 @@ public:
 		state.xc_dot = xc_dot;
 		state.r_dot = r_dot;
 
+		// set time stampe
+		state.header.stamp = t_now;
+
 		// publish system state
 		state_pub.publish(state);
 	    }
@@ -273,6 +279,9 @@ public:
 		state.ym_dot = ym_dot;
 		state.xc_dot = xc_dot;
 		state.r_dot = r_dot;
+
+		// set time stampe
+		state.header.stamp = t_now;
 
 		// publish system state
 		state_pub.publish(state);
@@ -314,6 +323,9 @@ public:
 		state.ym_dot = ym_dot;
 		state.xc_dot = xc_dot;
 		state.r_dot = r_dot;
+
+		// set time stampe
+		state.header.stamp = t_now;
 
 		// publish system state
 		state_pub.publish(state);
