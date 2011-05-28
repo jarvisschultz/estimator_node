@@ -1,6 +1,6 @@
-// nu_objecttracker.cpp
+// estimator_node.cpp
 // Jake Ware and Jarvis Schultz
-// Winter 2011
+// Spring 2011
 
 //---------------------------------------------------------------------------
 // Notes
@@ -19,13 +19,7 @@
 #include <puppeteer_msgs/State.h>
 #include <puppeteer_msgs/position_request.h>
 
-#include <visualization_msgs/Marker.h>
-
 #include <math.h>
-
-//---------------------------------------------------------------------------
-// Global Variables
-//---------------------------------------------------------------------------
 
 
 //---------------------------------------------------------------------------
@@ -61,7 +55,6 @@ public:
     StateEstimator() {
 	tracker_sub = n_.subscribe("/object1_position", 1, &StateEstimator::trackercb, this);
 	state_pub = n_.advertise<puppeteer_msgs::State> ("system_state", 100);
-	marker_pub = n_.advertise<visualization_msgs::Marker>("visualization_markers", 1);
 	position_request_client = n_.serviceClient<puppeteer_msgs::position_request>("position_request");
 	t_now = ros::Time::now();
 
@@ -80,6 +73,8 @@ public:
 	th_dot = 0.0; th_dot_last = 0.0;
 
 	dt = 0.0;
+
+	ROS_INFO("Starting Estimator...\n");
     }
 
     void trackercb(const puppeteer_msgs::PointPlus &point) {
@@ -111,9 +106,19 @@ public:
 	    // get error flag from object tracker data
 	    error_m = point.error;
 
+	    // check to see if robot index parameter exists.
+	    static int robot_index = 0;
+	    if(ros::param::has("robot_index")) {
+	      ros::param::get("/robot_index", robot_index);
+	    }
+	    else {
+	      ROS_WARN("Cannot Find Parameter: robot_index");
+	      ROS_INFO("Setting robot_index to 0");
+	      ros::param::set("/robot_index", 0);
+	    }
 	
 	    // request robot position
-	    position_request_srv.request.robot_index = 2;  // hardcoding this for now
+	    position_request_srv.request.robot_index = robot_index;
 	    position_request_srv.request.type = 'w';
 	    position_request_srv.request.Vleft = 0.0;
 	    position_request_srv.request.Vright = 0.0;
@@ -128,7 +133,6 @@ public:
 	    else {
 		ROS_ERROR("Failed to call service: position_request");
 	    }
-
 	    
 	    // get current time and dt to last call
 	    t_last = t_now;
@@ -273,6 +277,7 @@ public:
 		// publish system state
 		state_pub.publish(state);
 	    }
+
 	    // otherwise, we missed both robot and mass state updates
 	    else {
 		ROS_WARN("Missed both mass and cart updates");
@@ -337,75 +342,6 @@ public:
 
 	ROS_DEBUG("Leaving tracker callback");
     }
-
-// void SetState(int estimate_flag, float x, float y, float th, float dt)
-// {
-//   /* So this function takes in a new value for the pose of the */
-//   /* robot, and a flag that indicates what parameters need to be */
-//   /* estimated.  If the robot successfully returned new pose */
-//   /* values, we only need to estimate the velocities of the robot; */
-//   /* if not we need to estimate the whole state. */
-
-//   // Was it a successful read?
-//   if(estimate_flag == 1)
-//     {
-// 	// Just estimate velocities
-// 	x_pos_last = x_pos;
-// 	y_pos_last = y_pos;
-// 	theta_last = theta;
-
-// 	x_pos = x;
-// 	y_pos = y;
-// 	theta = th;
-
-//      	x_dot = (x_pos-x_pos_last)/dt;
-// 	y_dot = (y_pos-y_pos_last)/dt;
-// 	// Need to be careful with angular velocity:
-// 	omega = GetAngularVelocity(theta_last, theta, dt);
-//     }
-//   else
-//     {
-// 	// Need to estimate the whole state:
-// 	x_pos_last = x_pos;
-// 	y_pos_last = y_pos;
-// 	theta_last = theta;
-
-// 	x_pos = x_pos_last+x_dot*dt;
-// 	y_pos = y_pos_last+y_dot*dt;
-// 	theta = theta_last+omega*dt;
-//     }
-    
-//   return;
-// }
-
-
-// float GetAngularVelocity(float theta_old, float theta_new, float dt)
-// {
-//   /* This function returns the estimated angluar velocity of the
-//    * robot given two different angles and a timestep, it performs
-//    * the angular rollover logic*/
-
-//   if (theta_new >= theta_old && theta_new-theta_old <= M_PI)
-//     {
-// 	return (theta_new-theta_old)/dt;
-//     }
-//   else if (theta_new < theta_old && theta_old-theta_new <= M_PI)
-//     {
-// 	return (theta_new-theta_old)/dt;
-//     }
-//   else
-//     {
-// 	if(theta_new >= theta_old)
-// 	  {
-// 	    return -(theta_old+2.0*M_PI-theta_new)/dt;
-// 	  }
-// 	else
-// 	  {
-// 	    return (2.0*M_PI-theta_old+theta_new)/dt;
-// 	  }
-//     }
-//   return 0;
-// }
 };
 
 
@@ -418,7 +354,6 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "estimator_node");
   ros::NodeHandle n;
 
-  ROS_INFO("Starting Estimator...\n");
   StateEstimator estimator;
 
   ros::spin();
