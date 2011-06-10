@@ -119,7 +119,7 @@ public:
 	
 	    // request robot position
 	    position_request_srv.request.robot_index = robot_index;
-	    position_request_srv.request.type = 'w';
+	    position_request_srv.request.type = (uint8_t) 'w';
 	    position_request_srv.request.Vleft = 0.0;
 	    position_request_srv.request.Vright = 0.0;
 	    position_request_srv.request.Vtop = 0.0;
