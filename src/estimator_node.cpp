@@ -173,9 +173,10 @@ public:
       if(error_m == false && error_c == false) {
 	ROS_DEBUG("Successful update to mass and cart");
 
-	// calculate string length
-	// ignore z dimension for now and assume planar motion in x and y
-	r = sqrt(powf((xc-xm),2)+powf((ym),2));
+	// get new robot position data
+	xc = position_request_srv.response.xc;
+	zc = position_request_srv.response.zc;
+	th = position_request_srv.response.th;
 
 	// calculate new velocities
 	xm_dot = (xm-xm_last)/dt;
@@ -184,6 +185,10 @@ public:
 	xc_dot = (xc-xc_last)/dt;
 	zc_dot = (zc-zc_last)/dt;
 	r_dot = (r-r_last)/dt;
+
+	// calculate string length
+	// ignore z dimension for now and assume planar motion in x and y
+	r = sqrt(powf((xc-xm),2)+powf((ym),2));
       
 	// assign various components of system state
 	state.xm = xm;
@@ -221,14 +226,14 @@ public:
 	zc = position_request_srv.response.zc;
 	th = position_request_srv.response.th;
 
-	// calculate string length
-	// ignore z dimension for now and assume planar motion in x and y
-	r = sqrt(powf((xc-xm),2)+powf((ym),2));
-
-	// calculate new velocities
+	// calculate new cart velocities
 	xc_dot = (xc-xc_last)/dt;
 	zc_dot = (zc-zc_last)/dt;
 	r_dot = (r-r_last)/dt;
+
+	// calculate string length
+	// ignore z dimension for now and assume planar motion in x and y
+	r = sqrt(powf((xc-xm),2)+powf((ym),2));
             
 	// assign various components of system state
 	state.xm = xm;
@@ -251,6 +256,11 @@ public:
       else if(error_m == false && error_c == true) {
 	ROS_WARN("Missed cart update");
       
+	// calculate new velocities
+	xm_dot = (xm-xm_last)/dt;
+	ym_dot = (ym-ym_last)/dt;
+	zm_dot = (zm-zm_last)/dt;
+
 	// use old robot velocity values
 	xc_dot = xc_dot_last;
 	zc_dot = zc_dot_last;
@@ -262,11 +272,6 @@ public:
 	// calculate string length
 	// ignore z dimension for now and assume planar motion in x and y
 	r = sqrt(powf((xc-xm),2)+powf((ym),2));
-
-	// calculate new velocities
-	xm_dot = (xm-xm_last)/dt;
-	ym_dot = (ym-ym_last)/dt;
-	zm_dot = (zm-zm_last)/dt;
 
 	// assign various components of system state
 	state.xm = xm;
@@ -303,14 +308,14 @@ public:
 	xc_dot = xc_dot_last;
 	zc_dot = zc_dot_last;
 
-	// calculate string length
-	// ignore z dimension for now and assume planar motion in x and y
-	r = sqrt(powf((xc-xm),2)+powf((ym),2));
-
 	// calculate new velocities
 	xm_dot = (xm-xm_last)/dt;
 	ym_dot = (ym-ym_last)/dt;
 	zm_dot = (zm-zm_last)/dt;
+
+	// calculate string length
+	// ignore z dimension for now and assume planar motion in x and y
+	r = sqrt(powf((xc-xm),2)+powf((ym),2));
 
 	// assign various components of system state
 	state.xm = xm;
