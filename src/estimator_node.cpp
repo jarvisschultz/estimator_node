@@ -82,18 +82,27 @@ public:
   void trackercb(const puppeteer_msgs::PointPlus &point) {
     ROS_DEBUG("Entered tracker callback");
 
+    // get time for this update and store it
+    t_last = t_now;
+    t_now = ros::Time::now();
+
     // get error flag from object tracker data
     error_m = point.error;
 
-    // store last mass position values
-    xm_last = xm;
-    ym_last = ym;
-    zm_last = zm;
+    if(error_m == false) {
+      // store last mass position values
+      xm_last = xm;
+      ym_last = ym;
+      zm_last = zm;
       
-    // get new mass position data
-    xm = point.x;
-    ym = point.y;
-    zm = point.z;
+      // get new mass position data
+      xm = point.x;
+      ym = point.y;
+      zm = point.z;
+    }
+    else {
+      // estimate values for next time step
+    }
   }
 
   void timerCallback(const ros::TimerEvent& e) {
@@ -170,8 +179,8 @@ public:
       th_dot_last = th_dot;
 
       // did we get good mass position data from the object tracker and robot?
-      if(error_m == false && error_c == false) {
-	ROS_DEBUG("Successful update to mass and cart");
+      if(error_c == false) {
+	ROS_DEBUG("Successful update to cart position");
 
 	// get new robot position data
 	xc = position_request_srv.response.xc;
