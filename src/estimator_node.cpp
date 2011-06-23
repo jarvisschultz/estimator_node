@@ -126,7 +126,6 @@ public:
 		
 		// leave the velocities alone
 	    }
-	    ROS_INFO("Object CB: xm = %f\t xm_dot = %f\t dt = %f\t",xm,xm_dot,dt_tracker);
 	}
 
     void timerCallback(const ros::TimerEvent& e)
