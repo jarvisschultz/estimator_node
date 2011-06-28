@@ -30,3 +30,4 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #target_link_libraries(example ${PROJECT_NAME})
 
 rosbuild_add_executable(estimator_node src/estimator_node.cpp)
+rosbuild_add_executable(robot_estimator_3d src/robot_estimator_3d.cpp)
