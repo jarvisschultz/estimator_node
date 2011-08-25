@@ -74,12 +74,13 @@ public:
 
 	    // check if the operating_condition parameter exists and set its value
 	    int operating_condition = 0;
-	    static int first_flag = 0;
+	    static bool first_flag = true;
+	    static bool emergency_flag = false;
 	    if(ros::param::has("operating_condition"))
 	    {
-		if(first_flag == 0)
+		if(first_flag == true)
 		{
-		    first_flag++;
+		    first_flag = false;
 		    ros::param::set("/operating_condition", 0);
 		}
 		else
@@ -183,6 +184,7 @@ public:
 	    // are we in idle or stop condition?
 	    else if(operating_condition == 0 || operating_condition == 3)
 	    {
+		emergency_flag = false;
 		ROS_DEBUG("Estimator node is idle due to operating condition");
 	    } 
     
@@ -190,7 +192,6 @@ public:
 	    else if(operating_condition == 4)
 	    {
 		// did we get an emergency stop request?
-		static bool emergency_flag = false;
 		if(operating_condition == 4 && emergency_flag == false)
 		{
 		    ROS_WARN("Emergency Stop Requested");
