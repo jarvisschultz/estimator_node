@@ -23,6 +23,7 @@
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_datatypes.h>
+#include <tf_conversions/tf_eigen.h>
 #include <Eigen/Array>
 #include <geometry_msgs/Point.h>
 
@@ -32,7 +33,7 @@
 // Global Variables
 //---------------------------------------------------------------------------
 #define NUM_CALIBRATES (30)
-#define CORRECTION_RATE (30)
+#define CORRECTION_RATE (10)
 
 //---------------------------------------------------------------------------
 // Objects and Functions
@@ -62,6 +63,9 @@ private:
     float xc_dot, zc_dot, th_dot;
     float dt_timer;
     unsigned int calibrate_count;
+    tf::TransformListener tf;
+    tf::TransformBroadcaster br;
+
             
 public:
     PoseEstimator() {
@@ -102,15 +106,17 @@ public:
 			// Get robot's starting position in
 			// optimization coordinate system
 			double temp;
-			robot_start_pos <<
-			    ros::param::get("/robot_x0", temp),
-			    ros::param::get("/robot_y0", temp),
-			    ros::param::get("/robot_z0", temp);
+			ros::param::get("/robot_x0", temp);
+			robot_start_pos(0) = temp;
+			ros::param::get("/robot_y0", temp);
+			robot_start_pos(1) = temp;
+			ros::param::get("/robot_z0", temp);
+			robot_start_pos(2) = temp;
 		    }
 		    else
 		    {
 			ROS_WARN_ONCE("No parameter setting robot's start position");
-			std::cout << "\t Using a default value" << std::endl;
+			ROS_WARN_ONCE("Using a default value");
 			robot_start_pos << 0, 0, 0;
 		    }
 		    calibrate_count++;
@@ -142,19 +148,16 @@ public:
 		    return;
 		}		    
 	    }
-	    std::cout << robot_cal_pos << std::endl;
 
 	    // Publish optimization frame
-	    static tf::TransformBroadcaster br;
 	    tf::Transform transform;
-	    // transform.setOrigin(tf::Vector3(robot_cal_pos(0), robot_cal_pos(1), robot_cal_pos(2)));
-	    transform.setOrigin(tf::Vector3(1,1,1));
+	    ros::Time tstamp = ros::Time::now();
+	    transform.setOrigin(tf::Vector3(robot_cal_pos(0), robot_cal_pos(1), robot_cal_pos(2)));
 	    transform.setRotation(tf::Quaternion(0,0,0,1));
-	    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(),
+	    br.sendTransform(tf::StampedTransform(transform, tstamp,
 						  "/oriented_optimization_frame",
 						  "/optimization_frame"));
-
-	    ROS_INFO("Transforming Frame");
+	    
 	    // Transform the received point into the actual
 	    // optimization frame, store the old values, and store the
 	    // new transformed value
@@ -162,48 +165,37 @@ public:
 	    {
 		if (first_flag == true)
 		{
-		    geometry_msgs::PointStamped tmp_point;
-		    tmp_point.point.x = point.x;
-		    tmp_point.point.y = point.y;
-		    tmp_point.point.z = point.z;
-		    tmp_point.header.stamp = ros::Time::now();
-		    tmp_point.header.frame_id = "/oriented_optimization_frame";
-		    tf::TransformListener tf;
-		    try{
-			tf.transformPoint("/optimization_frame", tmp_point, transformed_robot);
-		    }
-		    catch (tf::TransformException ex)
-		    {
-			ROS_ERROR("%s",ex.what());
-			ros::Duration(1.0).sleep();
-		    }
+		    Eigen::eigen2_Transform3d gwo;
+		    Eigen::Vector3d tmp_point; 
+		    tf::TransformTFToEigen(transform, gwo);
+		    gwo = gwo.inverse();
+		    tmp_point << point.x, point.y, point.z;
+		    tmp_point = gwo*tmp_point;
+
 		    transformed_robot.header.frame_id = "/optimization_frame";
+		    transformed_robot.header.stamp = ros::Time::now();
+		    transformed_robot.point.x = tmp_point(0);
+		    transformed_robot.point.y = tmp_point(1);
+		    transformed_robot.point.z = tmp_point(2);
+		    
 		    transformed_robot_last = transformed_robot;
-		    first_flag = false;
+		    first_flag = false; 
 		}
 		else
 		{
 		    transformed_robot_last = transformed_robot;
-		    geometry_msgs::PointStamped tmp_point;
-		    tmp_point.point.x = point.x;
-		    tmp_point.point.y = point.y;
-		    tmp_point.point.z = point.z;
-		    tmp_point.header.stamp = ros::Time::now();
-		    tmp_point.header.frame_id = "/oriented_optimization_frame";
-		    tf::TransformListener tf;
-		    try{
-			tf.waitForTransform("/oriented_optimization_frame", "/optimization_frame",
-					    ros::Time::now(), ros::Duration(3.0));
-			tf.transformPoint("/optimization_frame", tmp_point, transformed_robot);
-		    }
-		    catch (tf::TransformException ex)
-		    {
-			ROS_ERROR("%s",ex.what());
-			ros::Duration(1.0).sleep();
-		    }
-		    
+		    Eigen::eigen2_Transform3d gwo;
+		    Eigen::Vector3d tmp_point; 
+		    tf::TransformTFToEigen(transform, gwo);
+		    gwo = gwo.inverse();
+		    tmp_point << point.x, point.y, point.z;
+		    tmp_point = gwo*tmp_point;
+
 		    transformed_robot.header.frame_id = "/optimization_frame";
-		    transformed_robot_last = transformed_robot;
+		    transformed_robot.header.stamp = ros::Time::now();
+		    transformed_robot.point.x = tmp_point(0);
+		    transformed_robot.point.y = tmp_point(1);
+		    transformed_robot.point.z = tmp_point(2);
 		}		
 	    }
 	    return;
@@ -239,33 +231,39 @@ public:
 	    // check to see if we are in run state
 	    if(operating_condition == 1 || operating_condition == 2)
 	    {
-		call_count++;
-		if (call_count%CORRECTION_RATE)
+		if(calibrated_flag == true)
 		{
-		    if (error_kinect)
-		    {
-			call_count--;
-			get_robot_estimate();
-		    }
-		    else
-			make_robot_correction();		   
+		    make_robot_correction();
+		    // call_count++;
+		    // if (call_count%CORRECTION_RATE == 0)
+		    // {
+		    // 	if (error_kinect)
+		    // 	{
+		    // 	    call_count--;
+		    // 	    get_robot_estimate();
+		    // 	}
+		    // 	else
+		    // 	{
+		    // 	    ROS_INFO("Correcting robot's pose");
+		    // 	    make_robot_correction();
+		    // 	}
+		    // }
+		    // else
+		    // {
+		    // 	// Let's then get the robot's estimate of its state:
+		    // 	get_robot_estimate();
+		    // }
+		    // // fill out pose message:
+		    // pose.x_robot = xc;
+		    // pose.y_robot = zc;
+		    // pose.theta = th;
+		    // pose.error = error_c;
+		    // // set time stamp
+		    // pose.header.stamp = t_now_timer;
+		    // pose.header.frame_id = "/optimization_frame";
+		    // // publish system state
+		    // pose_pub.publish(pose);
 		}
-		else
-		{
-		    // Let's then get the robot's estimate of its state:
-		    get_robot_estimate();
-		}
-
-		// fill out pose message:
-		pose.x_robot = xc;
-		pose.y_robot = zc;
-		pose.theta = th;
-		pose.error = error_c;
-		// set time stamp
-		pose.header.stamp = t_now_timer;
-		pose.header.frame_id = "/optimization_frame";
-		// publish system state
-		pose_pub.publish(pose);
 		return;
 	    }
 	    // are we in idle or stop condition?
@@ -301,33 +299,52 @@ public:
 
 	    // So, let's call the service to send the update command
 	    // to the robot:
-	    float x, y, th;
+	    float x, y, theta;
 	    x = transformed_robot.point.x;
 	    y = transformed_robot.point.z;
 
 	    // estimate theta:
-	    th = atan2(y-transformed_robot_last.point.z,
+	    theta = atan2(y-transformed_robot_last.point.z,
 		       x-transformed_robot_last.point.x);
-	    while(th <= 0)
-		th += 2.0*M_PI;
+	    while(theta <= 0)
+		theta += 2.0*M_PI;
 	    while(th > 2.0*M_PI)
-		th -= 2.0*M_PI;
+		theta -= 2.0*M_PI;
 
 	    // correct robot's estimate:
 	    srv.request.robot_index = robot_index;
 	    srv.request.type = 'l';
 	    srv.request.Vleft = x;
 	    srv.request.Vright = y;
-	    srv.request.Vtop = th;
-	    srv.request.div = 4;	    
+	    srv.request.Vtop = theta;
+	    srv.request.div = 4;
+
+	    // // send request to service
+	    // if(correction_client.call(srv))
+	    // {
+	    // 	if(srv.response.error == false)
+	    // 	    ROS_DEBUG("Send Successful: speed_command\n");
+	    // 	else
+	    // 	{
+	    // 	    ROS_DEBUG("Send Request Denied: speed_command\n");
+	    // 	    static bool request_denied_notify = true;
+	    // 	    if(request_denied_notify)
+	    // 	    {
+	    // 		ROS_INFO("Send Requests Denied: speed_command\n");
+	    // 		request_denied_notify = false;
+	    // 	    }
+	    // 	}
+	    // }
+	    // else 
+	    // 	ROS_ERROR("Failed to call service: speed_command\n");
 	    
 	    // fill out pose message:
-	    pose.x_robot = xc;
-	    pose.y_robot = zc;
-	    pose.theta = th;
+	    pose.x_robot = x;
+	    pose.y_robot = y;
+	    pose.theta = theta;
 	    pose.error = error_c;
 	    // set time stamp
-	    pose.header.stamp = t_now_timer;
+	    pose.header.stamp = ros::Time::now();
 	    pose.header.frame_id = "/optimization_frame";
 	    // publish system state
 	    pose_pub.publish(pose);
