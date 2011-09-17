@@ -416,8 +416,6 @@ public:
 	    printf("Kinect = %f\t Robot = %f\n",kinect_estimate(2),
 		   robot_estimate(2));
 	    
-	    // optimal_estimate = robot_estimate.array() + gains.array()*
-	    // 	(kinect_estimate.array()-robot_estimate.array());
 	    for(unsigned int i = 0; i < 3; i++)
 		optimal_estimate(i) = robot_estimate(i)+
 		    gains(i)*(kinect_estimate(i)-robot_estimate(i));
