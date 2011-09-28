@@ -24,7 +24,7 @@
 #include <tf/transform_listener.h>
 #include <tf/transform_datatypes.h>
 #include <tf_conversions/tf_eigen.h>
-#include <Eigen/Array>
+#include <Eigen/Core>
 #include <geometry_msgs/Point.h>
 
 #include <math.h>
@@ -181,7 +181,7 @@ public:
 	    {
 		if (first_flag == true)
 		{
-		    Eigen::eigen2_Transform3d gwo;
+		    Eigen::Affine3d gwo;
 		    Eigen::Vector3d tmp_point; 
 		    tf::TransformTFToEigen(transform, gwo);
 		    gwo = gwo.inverse();
@@ -200,7 +200,7 @@ public:
 		else
 		{
 		    transformed_robot_last = transformed_robot;
-		    Eigen::eigen2_Transform3d gwo;
+		    Eigen::Affine3d gwo;
 		    Eigen::Vector3d tmp_point; 
 		    tf::TransformTFToEigen(transform, gwo);
 		    gwo = gwo.inverse();
