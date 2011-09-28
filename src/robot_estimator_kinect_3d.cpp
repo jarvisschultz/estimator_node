@@ -34,6 +34,7 @@
 //---------------------------------------------------------------------------
 #define NUM_CALIBRATES (30)
 #define STDEV_RATE (10)
+FILE *fp;
 
 //---------------------------------------------------------------------------
 // Objects and Functions
@@ -98,6 +99,9 @@ public:
 	dt_timer = 0.0;
 
 	ROS_INFO("Starting Robot Pose Estimator...\n");
+
+	fp = fopen("/home/jarvis/Desktop/data.txt","w");
+	fprintf(fp,"Kinect Robot Optimal");
     }
     
     void trackercb(const puppeteer_msgs::PointPlus &point)
@@ -416,17 +420,20 @@ public:
 	    printf("Kinect = %f\t Robot = %f\n",kinect_estimate(2),
 		   robot_estimate(2));
 	    
+	    fprintf(fp, "%f\t%f\t",kinect_estimate(2), robot_estimate(2));
+	    
 	    for(unsigned int i = 0; i < 3; i++)
 		optimal_estimate(i) = robot_estimate(i)+
 		    gains(i)*(kinect_estimate(i)-robot_estimate(i));
 	    printf("Optimal = %f\n",optimal_estimate(2));
+	    fprintf(fp, "%f\n",optimal_estimate(2));
 	    
-	    pose.x_robot = optimal_estimate(0);
-	    pose.y_robot = optimal_estimate(1);
-	    pose.theta = optimal_estimate(2);
-	    // pose.x_robot = robot_estimate(0);
-	    // pose.y_robot = robot_estimate(1);
-	    // pose.theta = robot_estimate(2);
+	    // pose.x_robot = optimal_estimate(0);
+	    // pose.y_robot = optimal_estimate(1);
+	    // pose.theta = optimal_estimate(2);
+	    pose.x_robot = robot_estimate(0);
+	    pose.y_robot = robot_estimate(1);
+	    pose.theta = robot_estimate(2);
 	    pose.error = error_c;
 	    pose.header.stamp = ros::Time::now();
 	    pose.header.frame_id = "/optimization_frame";
