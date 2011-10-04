@@ -91,7 +91,7 @@ public:
 		ROS_WARN("Cannot Find Parameter: operating_condition");
 		ROS_INFO("Setting operating_condition to IDLE");
 		ros::param::set("/operating_condition", 0);
-      
+		first_flag = false;      
 		return;
 	    }
 
