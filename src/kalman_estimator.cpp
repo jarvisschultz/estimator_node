@@ -447,6 +447,7 @@ public:
 	    // pose and publish the results
 	    rob_pose.header.stamp = pose.header.stamp;
 	    rob_pose.header.frame_id = "/odom";
+	    rob_pose.child_frame_id = "/base_footprint";
 	    rob_pose.pose.pose.position.x = pose.x_robot;
 	    rob_pose.pose.pose.position.y = -pose.y_robot;
 	    rob_pose.pose.pose.position.z = 0.0;
