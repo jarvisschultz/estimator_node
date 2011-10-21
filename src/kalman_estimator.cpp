@@ -26,6 +26,7 @@
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Core>
 #include <geometry_msgs/Point.h>
+#include <nav_msgs/Odometry.h>
 
 #include <math.h>
 
@@ -44,7 +45,7 @@ class PoseEstimator {
 
 private:
     ros::NodeHandle node_;
-    ros::Publisher pose_pub;
+    ros::Publisher pose_pub, vo_pub, odom_pub;
     ros::Timer timer;
     ros::Time t_now_timer, t_last_timer;
     ros::ServiceClient position_request_client, correction_client;
@@ -68,8 +69,9 @@ private:
     unsigned int calibrate_count;
     tf::TransformListener tf;
     tf::TransformBroadcaster br;
-    float Kx, Ky, Kth;
     unsigned int call_count;
+    ros::Time tstamp;
+    nav_msgs::Odometry kin_pose, rob_pose;
 
             
 public:
@@ -77,6 +79,8 @@ public:
 	robot_kinect_sub = node_.subscribe("/robot_kinect_position", 1,
 					   &PoseEstimator::trackercb, this);
 	pose_pub = node_.advertise<puppeteer_msgs::RobotPose> ("robot_pose", 100);
+	vo_pub = node_.advertise<nav_msgs::Odometry> ("vo", 100);
+	odom_pub = node_.advertise<nav_msgs::Odometry> ("odom", 100);
 	position_request_client = node_.
 	    serviceClient<puppeteer_msgs::position_request>("position_request");
 	correction_client = node_.
@@ -91,21 +95,35 @@ public:
 	calibrate_count = 0;
 	call_count = 0;
 
-	// Set gains:
-	Kx = 0.75; Ky = Kx;
-	Kth = 0.0;
-	
 	// initialize all state variables to zero
 	xc = 0.0; zc = 0.0; xc_last = 0.0; zc_last = 0.0;
 	th = 0.0; th_last = 0.0;
 	xc_dot = 0.0; zc_dot = 0.0; th_dot = 0.0;
 	
 	dt_timer = 0.0;
+	tstamp = ros::Time::now();
 
+	// set covariance for the pose messages
+	double kin_cov_dist = 0.0025;	// in meters^2
+	double kin_cov_ori = 0.2;	// radians^2
+	double rob_cov_dist = 0.001;	// in meters^2
+	double rob_cov_ori = 0.02;	// radians^2
+	boost::array<double,36ul> kincov = {{kin_cov_dist, 0, 0, 0, 0, 0,
+					     0, kin_cov_dist, 0, 0, 0, 0,
+					     0, 0,        99999, 0, 0, 0,
+					     0, 0, 0,        99999, 0, 0,
+					     0, 0, 0, 0,        99999, 0,
+					     0, 0, 0, 0, 0,  kin_cov_ori}};
+	boost::array<double,36ul> robcov = {{rob_cov_dist, 0, 0, 0, 0, 0,
+					     0, rob_cov_dist, 0, 0, 0, 0,
+					     0, 0,        99999, 0, 0, 0,
+					     0, 0, 0,        99999, 0, 0,
+					     0, 0, 0, 0,        99999, 0,
+					     0, 0, 0, 0, 0,  rob_cov_ori}};
+	kin_pose.pose.covariance = kincov;
+	rob_pose.pose.covariance = robcov;	
+	
 	ROS_INFO("Starting Robot Pose Estimator...\n");
-
-	fp = fopen("/home/jarvis/Desktop/data.txt","w");
-	fprintf(fp,"Kinect Robot Optimal");
     }
     
     void trackercb(const puppeteer_msgs::PointPlus &point)
@@ -165,15 +183,13 @@ public:
 		    calibrate_count = 0;
 		    calibrated_flag = true;
 		    call_count = 0;
-		    Kth = 0.0;
 		    first_flag = true;
-		    return;
 		}		    
 	    }
 
 	    // Publish optimization frame
 	    tf::Transform transform;
-	    ros::Time tstamp = ros::Time::now();
+	    tstamp = ros::Time::now();
 	    transform.setOrigin(tf::Vector3(robot_cal_pos(0),
 					    robot_cal_pos(1), robot_cal_pos(2)));
 	    transform.setRotation(tf::Quaternion(0,0,0,1));
@@ -196,7 +212,12 @@ public:
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
 						  "/map",
 						  "/odom"));	    
-	    
+
+	    // Reset transform values for transforming data from
+	    // Kinect frame into optimization frame
+	    transform.setOrigin(tf::Vector3(robot_cal_pos(0),
+					    robot_cal_pos(1), robot_cal_pos(2)));
+	    transform.setRotation(tf::Quaternion(0,0,0,1));
 	    // Transform the received point into the actual
 	    // optimization frame, store the old values, and store the
 	    // new transformed value
@@ -212,7 +233,7 @@ public:
 		    tmp_point = gwo*tmp_point;
 
 		    transformed_robot.header.frame_id = "/optimization_frame";
-		    transformed_robot.header.stamp = ros::Time::now();
+		    transformed_robot.header.stamp = tstamp;
 		    transformed_robot.point.x = tmp_point(0);
 		    transformed_robot.point.y = tmp_point(1);
 		    transformed_robot.point.z = tmp_point(2);
@@ -231,7 +252,7 @@ public:
 		    tmp_point = gwo*tmp_point;
 
 		    transformed_robot.header.frame_id = "/optimization_frame";
-		    transformed_robot.header.stamp = ros::Time::now();
+		    transformed_robot.header.stamp = tstamp;
 		    transformed_robot.point.x = tmp_point(0);
 		    transformed_robot.point.y = tmp_point(1);
 		    transformed_robot.point.z = tmp_point(2);
@@ -269,11 +290,11 @@ public:
 	    // check to see if we are in run state
 	    if(operating_condition == 1 || operating_condition == 2)
 	    {
-		get_kinect_estimate();
 		if(calibrated_flag == true)
 		{
+		    get_kinect_estimate();
 		    get_robot_estimate();
-		    get_optimal_estimate();
+		    transform_robot_estimate();
 		}
 		return;
 	    }
@@ -368,102 +389,86 @@ public:
 
     void get_kinect_estimate(void)
 	{
-	    static float th_array[STDEV_RATE];
-	    static float tmp[STDEV_RATE] ;
-	    static float stdev;
-	    static float theta_last = 0.0;
-	    static float alpha = 0.1;
-	    float theta = 0.0, x = 0.0, z = 0.0;
-	    unsigned int i = 0;
-	    x = transformed_robot.point.x;
-	    z = transformed_robot.point.z;
-	    
-	    kinect_estimate << x, z, 0.0;
-		
-	    theta = atan2(z-transformed_robot_last.point.z,
-			  x-transformed_robot_last.point.x);
-	    
-	    // Let's low pass filter this:
-	    theta = alpha*theta+(1-alpha)*theta_last;
-	    theta_last = theta;
-	    
-	    while(theta <= 0)
-		theta += 2.0*M_PI;
-	    while(th > 2.0*M_PI)
-		theta -= 2.0*M_PI;
-
-	    if (call_count < STDEV_RATE)
+	    // Let's first get the transform from /optimization_frame
+	    // to /map
+	    static tf::StampedTransform transform;
+	    geometry_msgs::PointStamped tmp;
+		    
+	    try
 	    {
-		th_array[call_count] = theta;
-		call_count++;
-		kinect_estimate(2) = theta;
+		tf.lookupTransform(
+		    "map", "/optimization_frame",
+		    tstamp, transform);
+		tf.transformPoint("/map", transformed_robot, tmp);
+
+	    }
+	    catch(tf::TransformException& ex)
+	    {
+		ROS_ERROR(
+		    "Error trying to lookupTransform from /map "
+		    "to /optimization_frame: %s", ex.what());
 		return;
 	    }
-	    kinect_estimate(2) = theta;
-
-
-	    // Copy old array, and then set new array:
-	    memcpy(tmp, th_array, sizeof(th_array));
-	    th_array[0] = theta;	    
-	    for(i=1; i<STDEV_RATE; i++)
-		th_array[i] = tmp[i-1];
-
-	    stdev = calculate_stdev(th_array, STDEV_RATE);
-
-	    Kth = 0.01*sqrtf(1+powf(stdev,2.0))/stdev;
-	    if(Kth >= 1.0) Kth = 1.0;
-	    ROS_DEBUG("Changing the gain on theta to %f", Kth);
+	    
+	    // Now, let's transform the measured pose into the /map
+	    // frame
+	    kin_pose.header.stamp = tstamp;
+	    kin_pose.header.frame_id = "/map";
+	    kin_pose.child_frame_id = "/base_footprint";
+	    tmp.point.z = 0.0;
+	    kin_pose.pose.pose.position = tmp.point;
+	    double theta = atan2(transformed_robot.point.z-
+				 transformed_robot_last.point.z,
+				 transformed_robot.point.x-
+				 transformed_robot_last.point.x);
+	    theta = clamp_angle(theta-M_PI/2.0);
+	    geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromYaw(theta);
+	    kin_pose.pose.pose.orientation = quat;				 
+	    
+	    // Now let's publish the estimated pose as a
+	    // nav_msgs/Odometry message on a topic called /vo
+	    vo_pub.publish(kin_pose);
 	    return;
 	}
 
-    float calculate_stdev(const float ar[], const unsigned int size)
+    void transform_robot_estimate(void)
 	{
-	    // First calculate the mean:
-	    unsigned int i = 0;
-	    float mean = 0.0;
-	    float stdev = 0.0;
-	    for (i=0; i<size; i++)
-		mean += ar[i];
-	    mean /= ((float) size);
-
-	    // Now, the standard deviation:
-	    for (i=0; i<size; i++)
-		stdev += powf((ar[i]-mean),2.0);
-	    stdev /= ((float) size);
-	    stdev = sqrtf(stdev);
-	    return stdev;
-	}
-
-    void get_optimal_estimate(void)
-	{
-	    Eigen::Vector3d optimal_estimate, gains;
-	    gains << Kx, Ky, Kth;
-	    // gains << 0.0, 0.0, 0.0;
-	    ROS_INFO("Kth = %f",Kth);
-	    printf("Kinect = %f\t Robot = %f\n",kinect_estimate(2),
-		   robot_estimate(2));
-	    
-	    fprintf(fp, "%f\t%f\t",kinect_estimate(2), robot_estimate(2));
-	    
-	    for(unsigned int i = 0; i < 3; i++)
-		optimal_estimate(i) = robot_estimate(i)+
-		    gains(i)*(kinect_estimate(i)-robot_estimate(i));
-	    printf("Optimal = %f\n",optimal_estimate(2));
-	    fprintf(fp, "%f\n",optimal_estimate(2));
-	    
-	    // pose.x_robot = optimal_estimate(0);
-	    // pose.y_robot = optimal_estimate(1);
-	    // pose.theta = optimal_estimate(2);
+	    // First, we need to get the robot's returned estimate
+	    // into a PointPlus message and publish it
 	    pose.x_robot = robot_estimate(0);
 	    pose.y_robot = robot_estimate(1);
 	    pose.theta = robot_estimate(2);
 	    pose.error = error_c;
-	    pose.header.stamp = ros::Time::now();
+	    pose.header.stamp = t_now_timer;
 	    pose.header.frame_id = "/optimization_frame";
-
 	    pose_pub.publish(pose);
 
+	    // Now let's fill in the fields of the robot's odometry
+	    // pose and publish the results
+	    rob_pose.header.stamp = pose.header.stamp;
+	    rob_pose.header.frame_id = "/odom";
+	    rob_pose.pose.pose.position.x = pose.x_robot;
+	    rob_pose.pose.pose.position.y = -pose.y_robot;
+	    rob_pose.pose.pose.position.z = 0.0;
+
+	    double theta = pose.theta;
+	    theta = clamp_angle(-theta);
+	    geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromYaw(theta);
+	    rob_pose.pose.pose.orientation = quat;
+
+	    odom_pub.publish(rob_pose);
+
 	    return;
+	}
+
+    double clamp_angle(double theta)
+	{
+	    double th = theta;
+	    while(th > M_PI)
+		th -= 2.0*M_PI;
+	    while(th <= M_PI)
+		th += 2.0*M_PI;
+	    return th;
 	}
 };
 
