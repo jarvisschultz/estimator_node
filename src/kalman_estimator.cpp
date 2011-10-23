@@ -35,6 +35,7 @@
 //---------------------------------------------------------------------------
 #define NUM_CALIBRATES (30)
 #define STDEV_RATE (10)
+#define MAX_BAD_COUNTER (5)
 FILE *fp;
 
 //---------------------------------------------------------------------------
@@ -66,13 +67,13 @@ private:
     float th, th_last;
     float xc_dot, zc_dot, th_dot;
     float dt_timer;
-    unsigned int calibrate_count;
+    unsigned int calibrate_count, error_counter;
     tf::TransformListener tf;
     tf::TransformBroadcaster br;
     unsigned int call_count;
     ros::Time tstamp;
     nav_msgs::Odometry kin_pose, rob_pose;
-
+    
             
 public:
     PoseEstimator() {
@@ -99,6 +100,7 @@ public:
 	xc = 0.0; zc = 0.0; xc_last = 0.0; zc_last = 0.0;
 	th = 0.0; th_last = 0.0;
 	xc_dot = 0.0; zc_dot = 0.0; th_dot = 0.0;
+	error_counter = 0;
 	
 	dt_timer = 0.0;
 	tstamp = ros::Time::now();
@@ -374,6 +376,7 @@ public:
 		xc_dot = (xc-xc_last)/dt_timer;
 		zc_dot = (zc-zc_last)/dt_timer;
 		th_dot = (th-th_last)/dt_timer;
+		error_counter = 0;
 	    }
 	    else
 	    {
@@ -383,7 +386,16 @@ public:
 		xc += xc_dot*dt_timer;
 		zc += zc_dot*dt_timer;
 		th += th_dot*dt_timer;
+
+		error_counter++;
 	    }
+	    if (error_counter >= MAX_BAD_COUNTER)
+	    {
+		ROS_WARN_THROTTLE(5,"Serial communication problems detected!");
+		ros::param::set("/operating_condition", 4);
+	    }
+		    
+		
 	    robot_estimate << xc, zc, th;
 	}
 

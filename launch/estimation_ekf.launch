@@ -1,0 +1,8 @@
+<launch>
+  <arg name="debug" default="false"/>
+  <arg if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
+  <arg unless="$(arg debug)" name="launch_prefix" value=""/>
+  <node pkg="estimator_node" type="kalman_estimator" name="kalman_estimator_node" output="screen" launch-prefix="$(arg launch_prefix)">
+  </node>
+  <include file="$(find estimator_node)/launch/ekf_launcher.launch"/>
+</launch>
