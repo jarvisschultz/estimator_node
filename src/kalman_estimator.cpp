@@ -35,7 +35,7 @@
 //---------------------------------------------------------------------------
 #define NUM_CALIBRATES (30)
 #define STDEV_RATE (10)
-#define MAX_BAD_COUNTER (5)
+#define MAX_BAD_COUNTER (10)
 FILE *fp;
 
 //---------------------------------------------------------------------------
@@ -106,10 +106,14 @@ public:
 	tstamp = ros::Time::now();
 
 	// set covariance for the pose messages
-	double kin_cov_dist = 0.0025;	// in meters^2
-	double kin_cov_ori = 0.2;	// radians^2
-	double rob_cov_dist = 0.001;	// in meters^2
-	double rob_cov_ori = 0.02;	// radians^2
+	// double kin_cov_dist = 0.0025;	// in meters^2
+	// double kin_cov_ori = 0.2;	// radians^2
+	double kin_cov_dist = 99999;	// in meters^2
+	double kin_cov_ori = 99999;	// radians^2
+	double rob_cov_dist = 0.00001;	// in meters^2
+	double rob_cov_ori = 0.00001;	// radians^2
+	// double rob_cov_dist = 0.001;	// in meters^2
+	// double rob_cov_ori = 0.02;	// radians^2
 	boost::array<double,36ul> kincov = {{kin_cov_dist, 0, 0, 0, 0, 0,
 					     0, kin_cov_dist, 0, 0, 0, 0,
 					     0, 0,        99999, 0, 0, 0,
@@ -213,7 +217,7 @@ public:
 	    transform.setRotation(tf::Quaternion(0,0,0,1));
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
 						  "/map",
-						  "/odom"));	    
+						  "odom"));	    
 
 	    // Reset transform values for transforming data from
 	    // Kinect frame into optimization frame
@@ -440,6 +444,16 @@ public:
 	    // Now let's publish the estimated pose as a
 	    // nav_msgs/Odometry message on a topic called /vo
 	    vo_pub.publish(kin_pose);
+
+	    // Now let's publish a tf to the same frame:
+	    transform.setOrigin(tf::Vector3(tmp.point.x,
+					    tmp.point.y,
+					    tmp.point.z));
+	    transform.setRotation(tf::createQuaternionFromYaw(theta));
+	    br.sendTransform(tf::StampedTransform(transform, t_now_timer,
+						  "/map",
+						  "base_footprint"));		
+	    
 	    return;
 	}
 
@@ -458,8 +472,8 @@ public:
 	    // Now let's fill in the fields of the robot's odometry
 	    // pose and publish the results
 	    rob_pose.header.stamp = pose.header.stamp;
-	    rob_pose.header.frame_id = "/odom";
-	    rob_pose.child_frame_id = "/base_footprint";
+	    rob_pose.header.frame_id = "odom";
+	    rob_pose.child_frame_id = "base_footprint";
 	    rob_pose.pose.pose.position.x = pose.x_robot;
 	    rob_pose.pose.pose.position.y = -pose.y_robot;
 	    rob_pose.pose.pose.position.z = 0.0;
@@ -470,6 +484,21 @@ public:
 	    rob_pose.pose.pose.orientation = quat;
 
 	    odom_pub.publish(rob_pose);
+
+	    // Publish some frame info:
+	    tf::Transform transform;
+	    transform.setOrigin(tf::Vector3(pose.x_robot, -pose.y_robot,
+					    0.0));
+	    transform.setRotation(tf::createQuaternionFromYaw(theta));
+	    br.sendTransform(tf::StampedTransform(transform, t_now_timer,
+						  "odom", "base_footprint"));
+
+	    // Try to connect the ekf frame with main tree:
+	    transform.setOrigin(tf::Vector3(0,0,0));
+	    transform.setRotation(tf::createIdentityQuaternion());
+	    br.sendTransform(tf::StampedTransform(transform, t_now_timer,
+						  "/odom", "odom_combined"));
+	    
 
 	    return;
 	}
