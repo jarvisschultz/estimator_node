@@ -446,13 +446,14 @@ public:
 	    vo_pub.publish(kin_pose);
 
 	    // Now let's publish a tf to the same frame:
-	    transform.setOrigin(tf::Vector3(tmp.point.x,
-					    tmp.point.y,
-					    tmp.point.z));
-	    transform.setRotation(tf::createQuaternionFromYaw(theta));
-	    br.sendTransform(tf::StampedTransform(transform, t_now_timer,
-						  "/map",
-						  "base_footprint"));		
+	    // transform.setOrigin(tf::Vector3(tmp.point.x,
+	    // 				    tmp.point.y,
+	    // 				    tmp.point.z));
+	    // transform.setRotation(tf::createQuaternionFromYaw(theta));
+	    // br.sendTransform(tf::StampedTransform(transform, t_now_timer,
+	    // 					  "/map",
+	    // 					  "base_footprint"));	
+	    
 	    
 	    return;
 	}
@@ -487,17 +488,17 @@ public:
 
 	    // Publish some frame info:
 	    tf::Transform transform;
-	    transform.setOrigin(tf::Vector3(pose.x_robot, -pose.y_robot,
-					    0.0));
-	    transform.setRotation(tf::createQuaternionFromYaw(theta));
-	    br.sendTransform(tf::StampedTransform(transform, t_now_timer,
-						  "odom", "base_footprint"));
+	    // transform.setOrigin(tf::Vector3(pose.x_robot, -pose.y_robot,
+	    // 				    0.0));
+	    // transform.setRotation(tf::createQuaternionFromYaw(theta));
+	    // br.sendTransform(tf::StampedTransform(transform, t_now_timer,
+	    // 					  "odom", "base_footprint"));
 
 	    // Try to connect the ekf frame with main tree:
 	    transform.setOrigin(tf::Vector3(0,0,0));
 	    transform.setRotation(tf::createIdentityQuaternion());
 	    br.sendTransform(tf::StampedTransform(transform, t_now_timer,
-						  "/odom", "odom_combined"));
+	    					  "/odom", "odom_combined"));
 	    
 
 	    return;
