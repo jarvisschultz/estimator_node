@@ -36,6 +36,7 @@
 #define NUM_CALIBRATES (30)
 #define STDEV_RATE (10)
 #define MAX_BAD_COUNTER (10)
+#define NUM_EKF_INITS (3)
 FILE *fp;
 
 //---------------------------------------------------------------------------
@@ -106,14 +107,15 @@ public:
 	tstamp = ros::Time::now();
 
 	// set covariance for the pose messages
+	double kin_cov_dist = 0.01;	// in meters^2
+	double kin_cov_ori = pow(M_PI,2.0);	// radians^2
+	double rob_cov_dist = 0.001;	// in meters^2
+	double rob_cov_ori = 0.02;	// radians^2
+
 	// double kin_cov_dist = 0.0025;	// in meters^2
-	// double kin_cov_ori = 0.2;	// radians^2
-	double kin_cov_dist = 99999;	// in meters^2
-	double kin_cov_ori = 99999;	// radians^2
-	double rob_cov_dist = 0.00001;	// in meters^2
-	double rob_cov_ori = 0.00001;	// radians^2
-	// double rob_cov_dist = 0.001;	// in meters^2
-	// double rob_cov_ori = 0.02;	// radians^2
+	// double kin_cov_ori = 99999;
+	// double rob_cov_dist = 0.00001;	// in meters^2
+	// double rob_cov_ori = 0.00001;	// radians^2
 	boost::array<double,36ul> kincov = {{kin_cov_dist, 0, 0, 0, 0, 0,
 					     0, kin_cov_dist, 0, 0, 0, 0,
 					     0, 0,        99999, 0, 0, 0,
@@ -200,8 +202,8 @@ public:
 					    robot_cal_pos(1), robot_cal_pos(2)));
 	    transform.setRotation(tf::Quaternion(0,0,0,1));
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
-						  "/oriented_optimization_frame",
-						  "/optimization_frame"));
+						  "oriented_optimization_frame",
+						  "optimization_frame"));
 
 	    // Now publish a child to optimization frame called map,
 	    // and a child to map called odom.  All three frames are
@@ -211,13 +213,16 @@ public:
 	    transform.setOrigin(tf::Vector3(0.0,-robot_cal_pos(1),0.0));
 	    transform.setRotation(tf::Quaternion(.707107,0.0,0.0,-0.707107));
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
-						  "/optimization_frame",
-						  "/map"));
+						  "optimization_frame",
+						  "map"));
 	    transform.setOrigin(tf::Vector3(0,0,0));
 	    transform.setRotation(tf::Quaternion(0,0,0,1));
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
-						  "/map",
-						  "odom"));	    
+						  "map",
+						  "odom"));
+	    br.sendTransform(tf::StampedTransform(transform, tstamp,
+						  "odom",
+						  "odom_combined"));	    
 
 	    // Reset transform values for transforming data from
 	    // Kinect frame into optimization frame
@@ -238,7 +243,7 @@ public:
 		    tmp_point << point.x, point.y, point.z;
 		    tmp_point = gwo*tmp_point;
 
-		    transformed_robot.header.frame_id = "/optimization_frame";
+		    transformed_robot.header.frame_id = "optimization_frame";
 		    transformed_robot.header.stamp = tstamp;
 		    transformed_robot.point.x = tmp_point(0);
 		    transformed_robot.point.y = tmp_point(1);
@@ -257,7 +262,7 @@ public:
 		    tmp_point << point.x, point.y, point.z;
 		    tmp_point = gwo*tmp_point;
 
-		    transformed_robot.header.frame_id = "/optimization_frame";
+		    transformed_robot.header.frame_id = "optimization_frame";
 		    transformed_robot.header.stamp = tstamp;
 		    transformed_robot.point.x = tmp_point(0);
 		    transformed_robot.point.y = tmp_point(1);
@@ -274,6 +279,7 @@ public:
 	    // check if the operating_condition parameter exists and set its value
 	    int operating_condition = 0;
 	    static bool first_flag = true;
+	    static unsigned int init_ekf_count = 0;
 	    
 	    if(ros::param::has("operating_condition"))
 	    {
@@ -298,9 +304,19 @@ public:
 	    {
 		if(calibrated_flag == true)
 		{
-		    get_kinect_estimate();
-		    get_robot_estimate();
-		    transform_robot_estimate();
+		    if(init_ekf_count <= NUM_EKF_INITS)
+		    {
+			get_kinect_estimate(1);
+			get_robot_estimate();
+			transform_robot_estimate(1);
+		    }
+		    else
+		    {
+			get_kinect_estimate(operating_condition);
+			get_robot_estimate();
+			transform_robot_estimate(operating_condition);
+		    }
+		    init_ekf_count++;
 		}
 		return;
 	    }
@@ -318,6 +334,7 @@ public:
 
 	    calibrated_flag = false;
 	    calibrate_count = 0;
+	    init_ekf_count = 0;
 	}
 
     void get_robot_estimate(void)
@@ -403,7 +420,7 @@ public:
 	    robot_estimate << xc, zc, th;
 	}
 
-    void get_kinect_estimate(void)
+    void get_kinect_estimate(int op)
 	{
 	    // Let's first get the transform from /optimization_frame
 	    // to /map
@@ -413,9 +430,9 @@ public:
 	    try
 	    {
 		tf.lookupTransform(
-		    "map", "/optimization_frame",
+		    "map", "optimization_frame",
 		    tstamp, transform);
-		tf.transformPoint("/map", transformed_robot, tmp);
+		tf.transformPoint("map", transformed_robot, tmp);
 
 	    }
 	    catch(tf::TransformException& ex)
@@ -429,36 +446,35 @@ public:
 	    // Now, let's transform the measured pose into the /map
 	    // frame
 	    kin_pose.header.stamp = tstamp;
-	    kin_pose.header.frame_id = "/map";
-	    kin_pose.child_frame_id = "/base_footprint";
+	    kin_pose.header.frame_id = "odom_combined";
+	    kin_pose.child_frame_id = "base_footprint";
 	    tmp.point.z = 0.0;
 	    kin_pose.pose.pose.position = tmp.point;
-	    double theta = atan2(transformed_robot.point.z-
-				 transformed_robot_last.point.z,
-				 transformed_robot.point.x-
-				 transformed_robot_last.point.x);
-	    theta = clamp_angle(theta-M_PI/2.0);
+	    double theta = 0.0;
+	    if (op == 2)
+	    {
+		theta = atan2(transformed_robot.point.x-
+				     transformed_robot_last.point.x,
+				     transformed_robot.point.z-
+				     transformed_robot_last.point.z);
+		theta = clamp_angle(theta-M_PI/2.0);
+	    }
+	    else
+	    {
+		theta = robot_estimate(2);
+		theta = clamp_angle(-theta);
+	    }
 	    geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromYaw(theta);
 	    kin_pose.pose.pose.orientation = quat;				 
 	    
 	    // Now let's publish the estimated pose as a
 	    // nav_msgs/Odometry message on a topic called /vo
 	    vo_pub.publish(kin_pose);
-
-	    // Now let's publish a tf to the same frame:
-	    // transform.setOrigin(tf::Vector3(tmp.point.x,
-	    // 				    tmp.point.y,
-	    // 				    tmp.point.z));
-	    // transform.setRotation(tf::createQuaternionFromYaw(theta));
-	    // br.sendTransform(tf::StampedTransform(transform, t_now_timer,
-	    // 					  "/map",
-	    // 					  "base_footprint"));	
-	    
 	    
 	    return;
 	}
 
-    void transform_robot_estimate(void)
+    void transform_robot_estimate(int op)
 	{
 	    // First, we need to get the robot's returned estimate
 	    // into a PointPlus message and publish it
@@ -467,13 +483,14 @@ public:
 	    pose.theta = robot_estimate(2);
 	    pose.error = error_c;
 	    pose.header.stamp = t_now_timer;
-	    pose.header.frame_id = "/optimization_frame";
-	    pose_pub.publish(pose);
+	    pose.header.frame_id = "optimization_frame";
+	    if(op == 2)
+		pose_pub.publish(pose);
 
 	    // Now let's fill in the fields of the robot's odometry
 	    // pose and publish the results
 	    rob_pose.header.stamp = pose.header.stamp;
-	    rob_pose.header.frame_id = "odom";
+	    rob_pose.header.frame_id = "odom_combined";
 	    rob_pose.child_frame_id = "base_footprint";
 	    rob_pose.pose.pose.position.x = pose.x_robot;
 	    rob_pose.pose.pose.position.y = -pose.y_robot;
@@ -485,22 +502,6 @@ public:
 	    rob_pose.pose.pose.orientation = quat;
 
 	    odom_pub.publish(rob_pose);
-
-	    // Publish some frame info:
-	    tf::Transform transform;
-	    // transform.setOrigin(tf::Vector3(pose.x_robot, -pose.y_robot,
-	    // 				    0.0));
-	    // transform.setRotation(tf::createQuaternionFromYaw(theta));
-	    // br.sendTransform(tf::StampedTransform(transform, t_now_timer,
-	    // 					  "odom", "base_footprint"));
-
-	    // Try to connect the ekf frame with main tree:
-	    transform.setOrigin(tf::Vector3(0,0,0));
-	    transform.setRotation(tf::createIdentityQuaternion());
-	    br.sendTransform(tf::StampedTransform(transform, t_now_timer,
-	    					  "/odom", "odom_combined"));
-	    
-
 	    return;
 	}
 

@@ -9,7 +9,6 @@
   <param name="vo_used" value="true"/>
   <param name="debug" value="false"/>
   <param name="self_diagnose" value="true"/>
-
 </node>
 
 </launch>
