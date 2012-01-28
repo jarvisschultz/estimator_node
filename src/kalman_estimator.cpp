@@ -443,8 +443,7 @@ public:
 		return;
 	    }
 	    
-	    // Now, let's transform the measured pose into the /map
-	    // frame
+	    // Now we can publish the Kinect's of the robot's pose
 	    kin_pose.header.stamp = tstamp;
 	    kin_pose.header.frame_id = "odom_combined";
 	    kin_pose.child_frame_id = "base_footprint";
