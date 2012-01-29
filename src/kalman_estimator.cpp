@@ -443,7 +443,8 @@ public:
 		return;
 	    }
 	    
-	    // Now we can publish the Kinect's of the robot's pose
+	    // Now we can publish the Kinect's estimate of the robot's
+	    // pose
 	    kin_pose.header.stamp = tstamp;
 	    kin_pose.header.frame_id = "odom_combined";
 	    kin_pose.child_frame_id = "base_footprint";
