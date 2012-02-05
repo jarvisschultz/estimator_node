@@ -1,6 +1,7 @@
 # ignore these files
 Makefile
 *.pcd
+TAGS
 
 # ignore these directories and the files in them.
 *~
