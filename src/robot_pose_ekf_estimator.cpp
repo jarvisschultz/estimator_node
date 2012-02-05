@@ -111,11 +111,6 @@ public:
 	double kin_cov_ori = pow(M_PI,2.0);	// radians^2
 	double rob_cov_dist = 0.001;	// in meters^2
 	double rob_cov_ori = 0.02;	// radians^2
-
-	// double kin_cov_dist = 0.0025;	// in meters^2
-	// double kin_cov_ori = 99999;
-	// double rob_cov_dist = 0.00001;	// in meters^2
-	// double rob_cov_ori = 0.00001;	// radians^2
 	boost::array<double,36ul> kincov = {{kin_cov_dist, 0, 0, 0, 0, 0,
 					     0, kin_cov_dist, 0, 0, 0, 0,
 					     0, 0,        99999, 0, 0, 0,
@@ -362,61 +357,61 @@ public:
 	    position_request_srv.request.Vtop = 0.0;
 	    position_request_srv.request.div = 0;
 
- 	    // // call service and store error flag
-	    // if(position_request_client.call(position_request_srv))
-	    // {
-	    // 	error_c = position_request_srv.response.error;
-	    // }
-	    // // print error if the service call failed (not the
-	    // // same as a successful service call with a bad reply)
-	    // else
-	    // {
-	    // 	ROS_ERROR("Failed to call service: position_request");
-	    // }
+ 	    // call service and store error flag
+	    if(position_request_client.call(position_request_srv))
+	    {
+	    	error_c = position_request_srv.response.error;
+	    }
+	    // print error if the service call failed (not the
+	    // same as a successful service call with a bad reply)
+	    else
+	    {
+	    	ROS_ERROR("Failed to call service: position_request");
+	    }
 	    
-	    // // get current time and dt to last call
-	    // t_last_timer = t_now_timer;
-	    // t_now_timer = ros::Time::now();
-	    // dt_timer = (t_now_timer.toSec()-t_last_timer.toSec());
-	    // ROS_DEBUG("dt_timer: %f", dt_timer);
+	    // get current time and dt to last call
+	    t_last_timer = t_now_timer;
+	    t_now_timer = ros::Time::now();
+	    dt_timer = (t_now_timer.toSec()-t_last_timer.toSec());
+	    ROS_DEBUG("dt_timer: %f", dt_timer);
 
-	    // // store last positions and velocities
-	    // xc_last = xc;
-	    // zc_last = zc;
-	    // th_last = th;
+	    // store last positions and velocities
+	    xc_last = xc;
+	    zc_last = zc;
+	    th_last = th;
 
-	    // // did the robot correctly return its state?
-	    // if(error_c == false)
-	    // {
-	    // 	ROS_DEBUG("Successful robot update");
+	    // did the robot correctly return its state?
+	    if(error_c == false)
+	    {
+	    	ROS_DEBUG("Successful robot update");
 
-	    // 	// get new robot position data
-	    // 	xc = position_request_srv.response.xc;
-	    // 	zc = position_request_srv.response.zc;
-	    // 	th = position_request_srv.response.th;
+	    	// get new robot position data
+	    	xc = position_request_srv.response.xc;
+	    	zc = position_request_srv.response.zc;
+	    	th = position_request_srv.response.th;
 
-	    // 	// Set velocities:
-	    // 	xc_dot = (xc-xc_last)/dt_timer;
-	    // 	zc_dot = (zc-zc_last)/dt_timer;
-	    // 	th_dot = (th-th_last)/dt_timer;
-	    // 	error_counter = 0;
-	    // }
-	    // else
-	    // {
-	    // 	ROS_WARN("Missed robot update");
+	    	// Set velocities:
+	    	xc_dot = (xc-xc_last)/dt_timer;
+	    	zc_dot = (zc-zc_last)/dt_timer;
+	    	th_dot = (th-th_last)/dt_timer;
+	    	error_counter = 0;
+	    }
+	    else
+	    {
+	    	ROS_WARN("Missed robot update");
 
-	    // 	// estimate new position:
-	    // 	xc += xc_dot*dt_timer;
-	    // 	zc += zc_dot*dt_timer;
-	    // 	th += th_dot*dt_timer;
+	    	// estimate new position:
+	    	xc += xc_dot*dt_timer;
+	    	zc += zc_dot*dt_timer;
+	    	th += th_dot*dt_timer;
 
-	    // 	error_counter++;
-	    // }
-	    // if (error_counter >= MAX_BAD_COUNTER)
-	    // {
-	    // 	ROS_WARN_THROTTLE(5,"Serial communication problems detected!");
-	    // 	ros::param::set("/operating_condition", 4);
-	    // }
+	    	error_counter++;
+	    }
+	    if (error_counter >= MAX_BAD_COUNTER)
+	    {
+	    	ROS_WARN_THROTTLE(5,"Serial communication problems detected!");
+	    	ros::param::set("/operating_condition", 4);
+	    }
 		    
 		
 	    robot_estimate << xc, zc, th;
