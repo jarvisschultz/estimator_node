@@ -300,7 +300,7 @@ public:
 	    // pose
 	    kin_pose.header.stamp = tstamp;
 	    kin_pose.header.frame_id = "map";
-	    kin_pose.child_frame_id = "base_footprint";
+	    kin_pose.child_frame_id = "base_footprint_kinect";
 	    tmp.point.z = 0.0;
 	    kin_pose.pose.pose.position = tmp.point;
 	    double theta = 0.0;
@@ -315,7 +315,7 @@ public:
 	    else
 	    {
 		theta = robot_start_ori;
-		theta = clamp_angle(-theta);
+		theta = clamp_angle(-theta); 
 	    }
 	    geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromYaw(theta);
 	    kin_pose.pose.pose.orientation = quat;				 
