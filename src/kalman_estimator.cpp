@@ -323,6 +323,18 @@ public:
 	    // Now let's publish the estimated pose as a
 	    // nav_msgs/Odometry message on a topic called /vo
 	    vo_pub.publish(kin_pose);
+
+	    // now, let's publish the transform that goes along with it
+	    geometry_msgs::TransformStamped kin_trans;
+	    kin_trans.header.stamp = tstamp;
+	    kin_trans.header.frame_id = kin_pose.header.frame_id;
+	    kin_trans.child_frame_id = kin_pose.child_frame_id;
+	    kin_trans.transform.translation.x = kin_pose.pose.pose.position.x;
+	    kin_trans.transform.translation.y = kin_pose.pose.pose.position.y;
+	    kin_trans.transform.translation.z = kin_pose.pose.pose.position.z;
+	    kin_trans.transform.rotation = quat;
+
+	    br.sendTransform(kin_trans);
 	    
 	    return;
 	}
@@ -348,8 +360,10 @@ int main(int argc, char **argv)
     ROSCONSOLE_AUTOINIT;
     
     ros::init(argc, argv, "robot_estimator_3d");
-    // log4cxx::LoggerPtr my_logger = log4cxx::Logger::getLogger(ROSCONSOLE_DEFAULT_NAME);
-    // my_logger->setLevel(ros::console::g_level_lookup[ros::console::levels::Debug]);
+    // log4cxx::LoggerPtr my_logger =
+    // log4cxx::Logger::getLogger(ROSCONSOLE_DEFAULT_NAME);
+    // my_logger->setLevel(
+    // ros::console::g_level_lookup[ros::console::levels::Debug]);
     ros::NodeHandle node;
 
     PoseEstimator pose_estimator;
