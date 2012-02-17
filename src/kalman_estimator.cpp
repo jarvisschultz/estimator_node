@@ -334,6 +334,7 @@ public:
 	    kin_trans.transform.translation.z = kin_pose.pose.pose.position.z;
 	    kin_trans.transform.rotation = quat;
 
+	    ROS_DEBUG("Sending transform for output of estimator node");
 	    br.sendTransform(kin_trans);
 	    
 	    return;
