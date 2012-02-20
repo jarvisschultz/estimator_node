@@ -35,6 +35,8 @@
 //---------------------------------------------------------------------------
 #define NUM_CALIBRATES (30)
 #define NUM_EKF_INITS (3)
+#define ROBOT_CIRCUMFERENCE (57.5) // centimeters
+#define DEFAULT_RADIUS (ROBOT_CIRCUMFERENCE/M_PI/2.0/100.) // meters
 FILE *fp;
 
 //---------------------------------------------------------------------------
@@ -52,14 +54,14 @@ private:
     Eigen::Vector3d robot_start_pos;
     Eigen::Vector3d robot_cal_pos;
     Eigen::Vector3d kinect_estimate;
-    double robot_start_ori;
+    double robot_start_ori, robot_radius;
     
     puppeteer_msgs::position_request position_request_srv;
     puppeteer_msgs::speed_command srv;
 
     geometry_msgs::PointStamped transformed_robot, transformed_robot_last;
 
-    bool calibrated_flag, error_kinect;
+    bool calibrated_flag;
     unsigned int calibrate_count;
     tf::TransformListener tf;
     tf::TransformBroadcaster br;
@@ -91,15 +93,33 @@ public:
 					     0, 0, 0, 0,        99999, 0,
 					     0, 0, 0, 0, 0,  kin_cov_ori}};
 	kin_pose.pose.covariance = kincov;
+
+	// get the size of the robot:
+	if(ros::param::has("/robot_radius"))
+	    ros::param::get("/robot_radius", robot_radius);
+	else
+	{
+	    robot_radius = DEFAULT_RADIUS;
+	    ros::param::set("/robot_radius", robot_radius);
+	}
 	
 	ROS_INFO("Starting Robot Pose Estimator...\n");
     }
     
-    void trackercb(const puppeteer_msgs::PointPlus &point)
+    void trackercb(const puppeteer_msgs::PointPlus &p) 
 	{
 	    ROS_DEBUG("trackercb triggered");
 	    static bool first_flag = true;
-	    error_kinect = point.error;
+	    puppeteer_msgs::PointPlus point;
+	    ROS_DEBUG("Received Point Position = %f,%f,%f",p.x,p.y,p.z);
+
+	    point = p;	    
+	    // before we do anything, let's correct the values of
+	    // point to make up for the size of the robot
+	    point = correct_vals(point);
+	    ROS_DEBUG("Corrected Point Position = %f, %f, %f",point.x,point.y,point.z);
+
+	    
 	    // If need to calibrate, let's clear all of the values for the
 	    // necessary transformations
 	    if(calibrated_flag == false)
@@ -349,7 +369,31 @@ public:
 		th += 2.0*M_PI;
 	    return th;
 	}
-};
+
+    // this function accounts for the size of the robot:
+    puppeteer_msgs::PointPlus correct_vals(puppeteer_msgs::PointPlus &p)
+	{
+	    ROS_DEBUG("correct_vals called");
+	    puppeteer_msgs::PointPlus point;
+	    point = p;
+	    	    
+	    // let's create a unit vector from the kinect frame to the
+	    // robot's location
+	    Eigen::Vector3d ur;
+	    ur << p.x, p.y, p.z;
+	    // now turn it into a unit vector:
+	    ur = ur/ur.norm();
+	    // now we can correct the values of point
+	    ur = ur*robot_radius;
+	    
+	    point.x = point.x+ur(0);
+	    point.y = point.y+ur(1);
+	    point.z = point.z+ur(2);
+	    
+	    return(point);	    	    
+	}
+
+}; //  End Of PoseEstimator Class
 
 
 //--------------------------------------------------------------------------
@@ -362,9 +406,9 @@ int main(int argc, char **argv)
     
     ros::init(argc, argv, "robot_estimator_3d");
     // log4cxx::LoggerPtr my_logger =
-    // log4cxx::Logger::getLogger(ROSCONSOLE_DEFAULT_NAME);
+    // 	log4cxx::Logger::getLogger(ROSCONSOLE_DEFAULT_NAME);
     // my_logger->setLevel(
-    // ros::console::g_level_lookup[ros::console::levels::Debug]);
+    // 	ros::console::g_level_lookup[ros::console::levels::Debug]);
     ros::NodeHandle node;
 
     PoseEstimator pose_estimator;
