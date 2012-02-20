@@ -346,6 +346,12 @@ public:
 
 	    // now, let's publish the transform that goes along with it
 	    geometry_msgs::TransformStamped kin_trans;
+	    tf::Quaternion q1, q2;
+	    q1 = tf::createQuaternionFromYaw(theta);
+	    q2 = tf::Quaternion(1.0,0,0,0);
+	    q1 = q1*q2;
+	    tf::quaternionTFToMsg(q1, quat);
+
 	    kin_trans.header.stamp = tstamp;
 	    kin_trans.header.frame_id = kin_pose.header.frame_id;
 	    kin_trans.child_frame_id = kin_pose.child_frame_id;
