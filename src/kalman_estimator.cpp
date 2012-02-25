@@ -50,9 +50,9 @@ private:
     ros::Publisher vo_pub;
     ros::Timer timer;
     ros::Time t_now_timer, t_last_timer;
-    ros::Subscriber robot_kinect_sub;
-    Eigen::Vector3d robot_start_pos;
-    Eigen::Vector3d robot_cal_pos;
+    ros::Subscriber robot_kinect_sub, mass_kinect_sub;
+    Eigen::Vector3d robot_start_pos, mass_start_pos;
+    Eigen::Vector3d robot_cal_pos, mass_cal_pos, cal_pos;
     Eigen::Vector3d kinect_estimate;
     double robot_start_ori, robot_radius;
     
@@ -60,9 +60,10 @@ private:
     puppeteer_msgs::speed_command srv;
 
     geometry_msgs::PointStamped transformed_robot, transformed_robot_last;
+    geometry_msgs::PointStamped mass_pos;
 
     bool calibrated_flag;
-    unsigned int calibrate_count;
+    unsigned int calibrate_count_robot, calibrate_count_mass;
     tf::TransformListener tf;
     tf::TransformBroadcaster br;
     ros::Time tstamp;
@@ -73,6 +74,8 @@ public:
     PoseEstimator() {
 	robot_kinect_sub = node_.subscribe("/robot_kinect_position", 1,
 					   &PoseEstimator::trackercb, this);
+	mass_kinect_sub = node_.subscribe("/object1_position", 1,
+					   &PoseEstimator::masscb, this);
 	vo_pub = node_.advertise<nav_msgs::Odometry> ("vo", 100);
 	timer = node_.
 	    createTimer(ros::Duration(0.033), &PoseEstimator::timercb, this);
@@ -80,7 +83,7 @@ public:
 
 	// initialize communication error parameters to true for safety
 	calibrated_flag = false;  // We need to calibrate the sytem
-	calibrate_count = 0;
+	calibrate_count_mass = 0; calibrate_count_robot = 0;
 	tstamp = ros::Time::now();
 
 	// set covariance for the pose messages
@@ -105,11 +108,22 @@ public:
 	
 	ROS_INFO("Starting Robot Pose Estimator...\n");
     }
+
+    void masscb(const puppeteer_msgs::PointPlus &p)
+    	{
+	    if (!p.error)
+	    {
+		mass_pos.point.x = p.x;
+		mass_pos.point.y = p.y;
+		mass_pos.point.z = p.z;
+	    }
+    	}
     
     void trackercb(const puppeteer_msgs::PointPlus &p) 
 	{
 	    ROS_DEBUG("trackercb triggered");
 	    static bool first_flag = true;
+	    static bool consider_mass = false;
 	    puppeteer_msgs::PointPlus point;
 	    ROS_DEBUG("Received Point Position = %f,%f,%f",p.x,p.y,p.z);
 
@@ -119,12 +133,11 @@ public:
 	    point = correct_vals(point);
 	    ROS_DEBUG("Corrected Point Position = %f, %f, %f",point.x,point.y,point.z);
 
-	    
 	    // If need to calibrate, let's clear all of the values for the
 	    // necessary transformations
 	    if(calibrated_flag == false)
 	    {
-		if(calibrate_count == 0)
+		if(calibrate_count_robot == 0)
 		{
 		    if(ros::param::has("/robot_x0"))
 		    {
@@ -146,14 +159,29 @@ public:
 			ROS_WARN_ONCE("Using a default value");
 			robot_start_pos << 0, 0, 0;
 		    }
-		    calibrate_count++;
+
+		    if (ros::param::has("/mass_x0"))
+		    {
+			double temp;
+			consider_mass = true;
+			ros::param::get("/mass_x0", temp);
+			mass_start_pos(0) = temp;
+			ros::param::get("/mass_y0", temp);
+			mass_start_pos(1) = temp;
+			ros::param::get("/mass_z0", temp);
+			mass_start_pos(2) = temp;
+		    }			
+		    
+		    calibrate_count_robot++;
+		    calibrate_count_mass = 0;
 		    robot_cal_pos << 0, 0, 0;
+		    mass_cal_pos << 0, 0, 0;
 		    return;
 		}
 		// For the next few calls, let's average the robot
 		// position to establish the transformation from the
 		// oriented_optimization_frame to the actual optimization_frame
-		else if (calibrate_count <= NUM_CALIBRATES)
+		else if (calibrate_count_robot <= NUM_CALIBRATES)
 		{
 		    if (!point.error)
 		    {
@@ -161,7 +189,15 @@ public:
 		    	robot_cal_pos(1) += point.y;
 		    	robot_cal_pos(2) += point.z;
 
-		    	calibrate_count++;
+			if (consider_mass)
+			{
+			    calibrate_count_mass++;
+			    mass_cal_pos(0) += mass_pos.point.x;
+			    mass_cal_pos(1) += mass_pos.point.y;
+			    mass_cal_pos(2) += mass_pos.point.z;
+			}
+
+		    	calibrate_count_robot++;
 		    	return;
 		    }
 		}
@@ -170,7 +206,20 @@ public:
 		    // Find average robot_cal_pos
 		    robot_cal_pos = (robot_cal_pos/((float) NUM_CALIBRATES))-
 			robot_start_pos;
-		    calibrate_count = 0;
+		    if (consider_mass)
+		    {
+			mass_cal_pos = (mass_cal_pos/
+					((float) calibrate_count_mass))
+			    -mass_start_pos;
+			// cal_pos = (mass_cal_pos+robot_cal_pos)/2;
+			cal_pos = robot_cal_pos;
+			cal_pos(1) = mass_cal_pos(1);
+		    }
+		    else
+			cal_pos = robot_cal_pos;
+		    
+		    calibrate_count_robot = 0;
+		    calibrate_count_mass = 0;
 		    calibrated_flag = true;
 		    first_flag = true;
 		}		    
@@ -179,8 +228,8 @@ public:
 	    // Publish optimization frame
 	    tf::Transform transform;
 	    tstamp = ros::Time::now();
-	    transform.setOrigin(tf::Vector3(robot_cal_pos(0),
-					    robot_cal_pos(1), robot_cal_pos(2)));
+	    transform.setOrigin(tf::Vector3(cal_pos(0),
+					    cal_pos(1), cal_pos(2)));
 	    transform.setRotation(tf::Quaternion(0,0,0,1));
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
 						  "oriented_optimization_frame",
@@ -188,7 +237,7 @@ public:
 
 	    // publish /map frame at same height as robot, but
 	    // directly above /optimization_frame.  Z-axis is up.
-	    transform.setOrigin(tf::Vector3(0.0,-robot_cal_pos(1),0.0));
+	    transform.setOrigin(tf::Vector3(0.0,-cal_pos(1),0.0));
 	    transform.setRotation(tf::Quaternion(.707107,0.0,0.0,-0.707107));
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
 						  "optimization_frame",
@@ -204,8 +253,8 @@ public:
 
 	    // Reset transform values for transforming data from
 	    // Kinect frame into optimization frame
-	    transform.setOrigin(tf::Vector3(robot_cal_pos(0),
-					    robot_cal_pos(1), robot_cal_pos(2)));
+	    transform.setOrigin(tf::Vector3(cal_pos(0),
+					    cal_pos(1), cal_pos(2)));
 	    transform.setRotation(tf::Quaternion(0,0,0,1));
 	    
 	    // Transform the received point into the actual
@@ -236,6 +285,8 @@ public:
 	    }
 	    return;
 	}
+
+    
 
     void timercb(const ros::TimerEvent& e)
 	{
@@ -290,7 +341,8 @@ public:
 		ROS_ERROR("Invalid value for operating_condition");
 
 	    calibrated_flag = false;
-	    calibrate_count = 0;
+	    calibrate_count_mass = 0;
+	    calibrate_count_robot = 0;
 	    init_ekf_count = 0;
 	}
 
