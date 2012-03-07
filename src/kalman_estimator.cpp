@@ -52,7 +52,7 @@ private:
     ros::Time t_now_timer, t_last_timer;
     ros::Subscriber robot_kinect_sub, mass_kinect_sub;
     Eigen::Vector3d robot_start_pos, mass_start_pos;
-    Eigen::Vector3d robot_cal_pos, mass_cal_pos, cal_pos;
+    Eigen::Vector3d robot_cal_pos, mass_cal_pos;
     Eigen::Vector3d kinect_estimate;
     double robot_start_ori, robot_radius;
     
@@ -160,7 +160,7 @@ public:
 			robot_start_pos << 0, 0, 0;
 		    }
 
-		    if (ros::param::has("/mass_x0"))
+		    if (ros::param::has("/tracking_mass"))
 		    {
 			double temp;
 			consider_mass = true;
@@ -206,17 +206,16 @@ public:
 		    // Find average robot_cal_pos
 		    robot_cal_pos = (robot_cal_pos/((float) NUM_CALIBRATES))-
 			robot_start_pos;
+		    // find average mass_cal_pos
 		    if (consider_mass)
 		    {
 			mass_cal_pos = (mass_cal_pos/
 					((float) calibrate_count_mass))
 			    -mass_start_pos;
 			// cal_pos = (mass_cal_pos+robot_cal_pos)/2;
-			cal_pos = robot_cal_pos;
-			cal_pos(1) = mass_cal_pos(1);
+			// cal_pos = robot_cal_pos;
+			// cal_pos(1) = mass_cal_pos(1);
 		    }
-		    else
-			cal_pos = robot_cal_pos;
 		    
 		    calibrate_count_robot = 0;
 		    calibrate_count_mass = 0;
@@ -225,22 +224,38 @@ public:
 		}		    
 	    }
 
-	    // Publish optimization frame
 	    tf::Transform transform;
 	    tstamp = ros::Time::now();
-	    transform.setOrigin(tf::Vector3(cal_pos(0),
-					    cal_pos(1), cal_pos(2)));
-	    transform.setRotation(tf::Quaternion(0,0,0,1));
-	    br.sendTransform(tf::StampedTransform(transform, tstamp,
-						  "oriented_optimization_frame",
-						  "optimization_frame"));
+	    // If we are tracking mass publish optimization frame
+	    if (consider_mass)	    
+	    {
+		transform.setOrigin(tf::Vector3(mass_cal_pos(0),
+						mass_cal_pos(1),
+						mass_cal_pos(2)));
+		transform.setRotation(tf::Quaternion(0,0,0,1));
+		br.sendTransform(tf::StampedTransform(transform, tstamp,
+						      "oriented_optimization_frame",
+						      "optimization_frame"));
+	    }
+	    else
+	    {
+		transform.setOrigin(tf::Vector3(robot_cal_pos(0),
+						robot_cal_pos(1),
+						robot_cal_pos(2)));
+		transform.setRotation(tf::Quaternion(0,0,0,1));
+		br.sendTransform(tf::StampedTransform(transform, tstamp,
+						      "oriented_optimization_frame",
+						      "optimization_frame"));
+	    }
 
-	    // publish /map frame at same height as robot, but
-	    // directly above /optimization_frame.  Z-axis is up.
-	    transform.setOrigin(tf::Vector3(0.0,-cal_pos(1),0.0));
+	    
+	    // Publish /map frame based on robot calibration
+	    transform.setOrigin(tf::Vector3(robot_cal_pos(0),
+					    0,
+					    robot_cal_pos(2)));
 	    transform.setRotation(tf::Quaternion(.707107,0.0,0.0,-0.707107));
 	    br.sendTransform(tf::StampedTransform(transform, tstamp,
-						  "optimization_frame",
+						  "oriented_optimization_frame",
 						  "map"));
 	    
 	    // publish one more frame that is the frame the robot
@@ -253,9 +268,18 @@ public:
 
 	    // Reset transform values for transforming data from
 	    // Kinect frame into optimization frame
-	    transform.setOrigin(tf::Vector3(cal_pos(0),
-					    cal_pos(1), cal_pos(2)));
-	    transform.setRotation(tf::Quaternion(0,0,0,1));
+	    if (consider_mass)
+	    {
+		transform.setOrigin(tf::Vector3(mass_cal_pos(0),
+						mass_cal_pos(1), mass_cal_pos(2)));
+		transform.setRotation(tf::Quaternion(0,0,0,1));
+	    }
+	    else
+	    {
+		transform.setOrigin(tf::Vector3(robot_cal_pos(0),
+						robot_cal_pos(1), robot_cal_pos(2)));
+		transform.setRotation(tf::Quaternion(0,0,0,1));
+	    }		
 	    
 	    // Transform the received point into the actual
 	    // optimization frame, store the old values, and store the
