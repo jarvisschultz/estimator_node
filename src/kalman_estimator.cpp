@@ -37,7 +37,6 @@
 #define NUM_EKF_INITS (3)
 #define ROBOT_CIRCUMFERENCE (57.5) // centimeters
 #define DEFAULT_RADIUS (ROBOT_CIRCUMFERENCE/M_PI/2.0/100.) // meters
-FILE *fp;
 
 //---------------------------------------------------------------------------
 // Objects and Functions
