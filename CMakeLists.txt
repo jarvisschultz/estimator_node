@@ -29,6 +29,11 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #rosbuild_add_executable(example examples/example.cpp)
 #target_link_libraries(example ${PROJECT_NAME})
 
+## add eigen functionality
+find_package(Eigen REQUIRED)
+include_directories(${EIGEN_INCLUDE_DIRS})
+add_definitions(${EIGEN_DEFINITIONS})
+
 rosbuild_add_executable(estimator_node src/estimator_node.cpp)
 rosbuild_add_executable(robot_estimator_3d src/robot_estimator_3d.cpp)
 rosbuild_add_executable(robot_estimator_kinect_3d src/robot_estimator_kinect_3d.cpp)
