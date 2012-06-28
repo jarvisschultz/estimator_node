@@ -27,6 +27,7 @@
 #include <Eigen/Core>
 #include <geometry_msgs/Point.h>
 #include <nav_msgs/Odometry.h>
+#include <angles/angles.h>
 
 #include <math.h>
 
@@ -454,12 +455,12 @@ public:
 				     transformed_robot_last.point.x,
 				     transformed_robot.point.z-
 				     transformed_robot_last.point.z);
-		theta = clamp_angle(theta-M_PI/2.0);
+		theta = angles::normalize_angle(theta-M_PI/2.0);
 	    }
 	    else
 	    {
 		theta = robot_estimate(2);
-		theta = clamp_angle(-theta);
+		theta = angles::normalize_angle(-theta);
 	    }
 	    geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromYaw(theta);
 	    kin_pose.pose.pose.orientation = quat;				 
@@ -494,7 +495,7 @@ public:
 	    rob_pose.pose.pose.position.z = 0.0;
 
 	    double theta = pose.theta;
-	    theta = clamp_angle(-theta);
+	    theta = angles::normalize_angle(-theta);
 	    geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromYaw(theta);
 	    rob_pose.pose.pose.orientation = quat;
 
