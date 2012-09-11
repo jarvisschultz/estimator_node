@@ -442,16 +442,6 @@ public:
 	    return;
 	}
 
-    double clamp_angle(double theta)
-	{
-	    double th = theta;
-	    while(th > M_PI)
-		th -= 2.0*M_PI;
-	    while(th <= M_PI)
-		th += 2.0*M_PI;
-	    return th;
-	}
-
     // this function accounts for the size of the robot:
     puppeteer_msgs::PointPlus correct_vals(puppeteer_msgs::PointPlus &p)
 	{
