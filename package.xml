@@ -2,12 +2,9 @@
   <name>estimator_node</name>
   <version>1.0.0</version>
   <description>estimator_node</description>
-  <maintainer email="">puppeteer</maintainer>
+  <maintainer email="jarvis@todo.todo">puppeteer</maintainer>
 
-  <license>BSD</license>
-
-  <url type="website">http://ros.org/wiki/estimator_node</url>
-  <!-- <url type="bugtracker"></url> -->
+  <license>GPLv3</license>
 
   <author>puppeteer</author>
 
@@ -23,7 +20,8 @@
   <build_depend>nav_msgs</build_depend>
   <build_depend>robot_pose_ekf</build_depend>
   <build_depend>angles</build_depend>
-
+  <build_depend>libeigen3-dev</build_depend>
+  
   <!-- Dependencies needed after this package is compiled. -->
   <run_depend>roscpp</run_depend>
   <run_depend>puppeteer_msgs</run_depend>
