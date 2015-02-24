@@ -236,7 +236,7 @@ public:
 		{
 		    Eigen::Affine3d gwo;
 		    Eigen::Vector3d tmp_point; 
-		    tf::TransformTFToEigen(transform, gwo);
+		    tf::transformTFToEigen(transform, gwo);
 		    gwo = gwo.inverse();
 		    tmp_point << point.x, point.y, point.z;
 		    tmp_point = gwo*tmp_point;
@@ -255,7 +255,7 @@ public:
 		    transformed_robot_last = transformed_robot;
 		    Eigen::Affine3d gwo;
 		    Eigen::Vector3d tmp_point; 
-		    tf::TransformTFToEigen(transform, gwo);
+		    tf::transformTFToEigen(transform, gwo);
 		    gwo = gwo.inverse();
 		    tmp_point << point.x, point.y, point.z;
 		    tmp_point = gwo*tmp_point;

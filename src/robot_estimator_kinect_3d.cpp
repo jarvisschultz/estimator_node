@@ -183,7 +183,7 @@ public:
 		{
 		    Eigen::Affine3d gwo;
 		    Eigen::Vector3d tmp_point; 
-		    tf::TransformTFToEigen(transform, gwo);
+		    tf::transformTFToEigen(transform, gwo);
 		    gwo = gwo.inverse();
 		    tmp_point << point.x, point.y, point.z;
 		    tmp_point = gwo*tmp_point;
@@ -202,7 +202,7 @@ public:
 		    transformed_robot_last = transformed_robot;
 		    Eigen::Affine3d gwo;
 		    Eigen::Vector3d tmp_point; 
-		    tf::TransformTFToEigen(transform, gwo);
+		    tf::transformTFToEigen(transform, gwo);
 		    gwo = gwo.inverse();
 		    tmp_point << point.x, point.y, point.z;
 		    tmp_point = gwo*tmp_point;
@@ -451,7 +451,7 @@ public:
 
 int main(int argc, char **argv)
 {
-    ROSCONSOLE_AUTOINIT;
+    // ROSCONSOLE_AUTOINIT;
     
     ros::init(argc, argv, "robot_estimator_3d");
     // log4cxx::LoggerPtr my_logger = log4cxx::Logger::getLogger(ROSCONSOLE_DEFAULT_NAME);

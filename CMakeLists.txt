@@ -11,7 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf_conversions
   geometry_msgs
   nav_msgs
-  angles)
+  angles
+  cmake_modules)
 
 # include_directories(include ${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
 
@@ -28,10 +29,23 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   )
 
+
+
+# catkin_package parameters: http://ros.org/doc/groovy/api/catkin/html/dev_guide/generated_cmake_api.html#catkin-package
+# TODO: fill in what other packages will need to use this package
+catkin_package()
+    # DEPENDS roscpp puppeteer_msgs tf tf_conversions geometry_msgs nav_msgs angles
+    # CATKIN_DEPENDS # TODO
+    # INCLUDE_DIRS # TODO include
+    # LIBRARIES # TODO
+#)
+
+
 ## add eigen functionality
 include_directories(${EIGEN_INCLUDE_DIRS})
 add_definitions(${EIGEN_DEFINITIONS})
-
+# add logging functionality
+find_library(LOG4CXX_LIBRARY log4cxx)
 
 add_executable(estimator_node src/estimator_node.cpp)
 add_executable(robot_estimator_3d src/robot_estimator_3d.cpp)
@@ -46,17 +60,8 @@ add_dependencies(kalman_estimator ${catkin_EXPORTED_TARGETS}})
 
 
 target_link_libraries(estimator_node ${catkin_LIBRARIES})
-target_link_libraries(robot_estimator_3d ${catkin_LIBRARIES}})
-target_link_libraries(robot_estimator_kinect_3d ${catkin_LIBRARIES}})
-target_link_libraries(kalman_estimator ${catkin_LIBRARIES}})
+target_link_libraries(robot_estimator_3d ${catkin_LIBRARIES})
+target_link_libraries(robot_estimator_kinect_3d ${catkin_LIBRARIES}) 
+target_link_libraries(kalman_estimator ${catkin_LIBRARIES})
 
 
-
-# catkin_package parameters: http://ros.org/doc/groovy/api/catkin/html/dev_guide/generated_cmake_api.html#catkin-package
-# TODO: fill in what other packages will need to use this package
-catkin_package(
-    DEPENDS roscpp puppeteer_msgs tf tf_conversions geometry_msgs nav_msgs angles
-    CATKIN_DEPENDS # TODO
-    INCLUDE_DIRS # TODO include
-    LIBRARIES # TODO
-)
